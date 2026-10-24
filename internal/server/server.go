@@ -50,6 +50,8 @@ func New(st *store.Store, authn *auth.Service, web fs.FS, opts Options) (http.Ha
 	private.HandleFunc("PATCH /api/documents/{id}", s.updateDocument)
 	private.HandleFunc("DELETE /api/documents/{id}", s.deleteDocument)
 	private.HandleFunc("POST /api/documents/{id}/restore", s.restoreDocument)
+	private.HandleFunc("POST /api/images", s.uploadImage)
+	private.HandleFunc("GET /api/images/{id}", s.getImage)
 	private.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "接口不存在")
 	})

@@ -231,3 +231,34 @@ func TestDocumentsAPI(t *testing.T) {
 		t.Errorf("bad id: status = %d", rec.Code)
 	}
 }
+
+func TestImagesAPI(t *testing.T) {
+	h := newTest(t)
+	png := "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+	rec := do(t, h, "POST", "/api/images", png)
+	var img store.Image
+	if rec.Code != http.StatusCreated || json.Unmarshal(rec.Body.Bytes(), &img) != nil || img.URL != "/api/images/"+img.ID {
+		t.Fatalf("upload: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	rec = do(t, h, "GET", img.URL, "")
+	if rec.Code != http.StatusOK || rec.Body.String() != png || rec.Header().Get("Content-Type") != "image/png" ||
+		rec.Header().Get("Cache-Control") != "private, max-age=31536000, immutable" {
+		t.Fatalf("get: status = %d, headers = %v", rec.Code, rec.Header())
+	}
+
+	if rec := do(t, h, "POST", "/api/images", "<svg/>"); rec.Code != http.StatusBadRequest {
+		t.Errorf("svg upload: status = %d", rec.Code)
+	}
+	if rec := do(t, h, "POST", "/api/images", png+strings.Repeat("x", store.MaxImageSize)); rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("large upload: status = %d", rec.Code)
+	}
+	for _, path := range []string{"/api/images/missing", "/api/images/..%2fasr.db"} {
+		if rec := do(t, h, "GET", path, ""); rec.Code != http.StatusNotFound {
+			t.Errorf("GET %s: status = %d", path, rec.Code)
+		}
+	}
+	h.session = h.signIn(t, "bob")
+	if rec := do(t, h, "GET", img.URL, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("bob gets alice's image: status = %d", rec.Code)
+	}
+}

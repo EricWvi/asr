@@ -96,7 +96,8 @@ func run(configPath string) error {
 }
 
 // purgeTrash removes documents that have been in the trash longer than
-// store.TrashRetention, once at startup and then hourly.
+// store.TrashRetention and then images no document refers to, once at
+// startup and then hourly.
 func purgeTrash(ctx context.Context, st *store.Store) {
 	tick := time.NewTicker(time.Hour)
 	defer tick.Stop()
@@ -106,6 +107,12 @@ func purgeTrash(ctx context.Context, st *store.Store) {
 			slog.Error("purge trash", "err", err)
 		} else if n > 0 {
 			slog.Info("purged deleted documents", "count", n)
+		}
+		n, err = st.PurgeImages(ctx, time.Now().Add(-store.ImageRetention))
+		if err != nil && ctx.Err() == nil {
+			slog.Error("purge images", "err", err)
+		} else if n > 0 {
+			slog.Info("purged unused images", "count", n)
 		}
 		select {
 		case <-ctx.Done():

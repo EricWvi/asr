@@ -25,6 +25,8 @@ function apply(v: EditorView, where: Where) {
 export function registerEditor(v: EditorView | null, doc: number | null = null) {
   view = v;
   viewDoc = doc;
+  // Browser tests drive the editor through this.
+  if (import.meta.env.DEV) (window as { __editor?: EditorView | null }).__editor = v;
   if (!v || !wanted || (wanted.doc !== null && wanted.doc !== doc)) return;
   // Wait a frame: a remount (StrictMode) may replace this view at once.
   requestAnimationFrame(() => {

@@ -1,4 +1,5 @@
-// Package store persists users, sessions and their documents in SQLite.
+// Package store persists users, sessions, documents and images in SQLite
+// and the data dir.
 package store
 
 import (
@@ -24,10 +25,12 @@ var (
 // Store is safe for concurrent use. Every query on user content is scoped
 // to one user.
 type Store struct {
-	db *sql.DB
+	db  *sql.DB
+	dir string
 }
 
-// Open opens (and migrates) the database inside dataDir.
+// Open opens (and migrates) the database inside dataDir. Uploaded files
+// are kept next to it.
 func Open(dataDir string) (*Store, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
@@ -44,7 +47,7 @@ func Open(dataDir string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	return &Store{db: db}, nil
+	return &Store{db: db, dir: dataDir}, nil
 }
 
 // Close closes the database.

@@ -54,6 +54,18 @@ var migrations = []migration{
 	CREATE INDEX documents_user ON documents (user_id, updated_at DESC) WHERE deleted_at IS NULL;
 	CREATE INDEX documents_deleted ON documents (deleted_at) WHERE deleted_at IS NOT NULL;
 	`),
+	execSQL(`
+	-- Pasted images. The bytes live in files under the data dir; a row
+	-- records who owns the image and how to serve it.
+	CREATE TABLE images (
+		id         TEXT    PRIMARY KEY,
+		user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		mime       TEXT    NOT NULL,
+		size       INTEGER NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+	CREATE INDEX images_created ON images (created_at);
+	`),
 }
 
 func migrate(db *sql.DB) error {

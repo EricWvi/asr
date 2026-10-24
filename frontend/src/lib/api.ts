@@ -51,9 +51,13 @@ async function request<T>(method: string, path: string, body?: unknown, keepaliv
 }
 
 export const api = {
+  /** Uploads pasted or dropped image bytes; the URL goes into the Markdown. */
+  uploadImage: (file: Blob) => request<{ id: string; url: string }>("POST", "/api/images", file),
   me: () => request<User>("GET", "/api/me"),
   documents: () => request<DocSummary[]>("GET", "/api/documents"),
-  document: (id: number) => request<Doc>("GET", `/api/documents/${id}`),
+  // The server leaves out empty content.
+  document: (id: number) =>
+    request<Doc>("GET", `/api/documents/${id}`).then((d) => ({ ...d, content: d.content ?? "" })),
   createDocument: (title: string) => request<Doc>("POST", "/api/documents", { title }),
   /** keepalive lets a small save finish while the page unloads. */
   updateDocument: (id: number, patch: DocPatch, keepalive = false) =>

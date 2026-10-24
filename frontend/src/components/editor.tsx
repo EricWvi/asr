@@ -1,16 +1,20 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Prec } from "@codemirror/state";
 import { drawSelection, EditorView, keymap } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { useEffect, useRef } from "react";
 
+import { imageUpload } from "@/editor/images";
+import { dedentListItem, exitEmptyListItem, indentListItem } from "@/editor/lists";
+import { livePreview } from "@/editor/live-preview";
+import { highlightTag, markdownSupport } from "@/editor/syntax";
 import { registerEditor } from "@/lib/editor-focus";
 
 /*
- * Plain Markdown source with syntax styling. Live preview (hiding marks
- * off the cursor line) comes later as decorations on top of this.
+ * Markdown source with live preview: the cursor's lines show their marks,
+ * the rest render (see editor/live-preview.ts). Line-level styles live in
+ * index.css under .cm-md-*.
  */
 
 const theme = EditorView.theme({
@@ -31,16 +35,16 @@ const markdownStyle = HighlightStyle.define([
   { tag: tags.heading2, fontSize: "20px", fontWeight: "650" },
   { tag: tags.heading3, fontSize: "17px", fontWeight: "600" },
   { tag: [tags.heading4, tags.heading5, tags.heading6], fontWeight: "600" },
-  // #, -, >, **, ` and other syntax marks take the document's deep tint.
-  { tag: tags.processingInstruction, color: "var(--tint-deep)", fontWeight: "500" },
   { tag: tags.strong, fontWeight: "600" },
   { tag: tags.emphasis, fontStyle: "italic" },
   { tag: tags.strikethrough, textDecoration: "line-through" },
+  { tag: highlightTag, class: "cm-md-mark" },
   { tag: tags.link, color: "var(--blue)" },
-  { tag: tags.url, color: "var(--ink-3)" },
-  { tag: tags.monospace, fontFamily: '"SF Mono", ui-monospace, Menlo, monospace', fontSize: "0.85em" },
+  { tag: tags.url, class: "cm-md-url" },
+  { tag: tags.monospace, fontFamily: '"SF Mono", ui-monospace, Menlo, monospace' },
   { tag: tags.quote, color: "var(--ink-2)" },
-  { tag: tags.contentSeparator, color: "var(--ink-3)" },
+  // #, -, >, **, ` and other syntax marks take the document's deep tint (.cm-md-pi).
+  { tag: tags.processingInstruction, class: "cm-md-pi" },
 ]);
 
 export function Editor({
@@ -66,9 +70,22 @@ export function Editor({
           history(),
           drawSelection(),
           EditorView.lineWrapping,
-          markdown({ base: markdownLanguage }),
+          markdownSupport(),
           syntaxHighlighting(markdownStyle),
-          keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+          livePreview,
+          imageUpload,
+          // Ahead of the Markdown keymap, which has high precedence.
+          Prec.highest(
+            keymap.of([
+              { key: "Enter", run: exitEmptyListItem },
+              { key: "Tab", run: indentListItem, shift: dedentListItem },
+            ]),
+          ),
+          keymap.of([
+            ...defaultKeymap,
+            ...historyKeymap,
+            indentWithTab,
+          ]),
           theme,
           EditorView.updateListener.of((u) => {
             if (u.docChanged) changed.current(u.state.doc.toString());

@@ -199,3 +199,238 @@
     outline: none;
   }
 }
+
+/*
+ * Editor live preview (src/editor/live-preview.ts), after design/pc.html.
+ * Rules start with .cm-editor .cm-line to win over CodeMirror's own theme.
+ */
+.cm-editor .cm-line.cm-md-blank {
+  height: 14px;
+}
+.cm-editor .cm-line.cm-md-h {
+  position: relative;
+  line-height: 1.4;
+}
+.cm-editor .cm-line.cm-md-h1 {
+  font-size: 24px;
+  font-weight: 700;
+  padding: 22px 0 2px;
+}
+.cm-editor .cm-line.cm-md-h2 {
+  font-size: 20px;
+  font-weight: 650;
+  padding: 18px 0 2px;
+}
+.cm-editor .cm-line.cm-md-h3 {
+  font-size: 17px;
+  font-weight: 600;
+  padding-top: 10px;
+}
+.cm-editor .cm-line.cm-md-h4,
+.cm-editor .cm-line.cm-md-h5,
+.cm-editor .cm-line.cm-md-h6 {
+  font-weight: 600;
+  padding-top: 6px;
+}
+.cm-editor .cm-line.cm-md-h.cm-md-first {
+  padding-top: 0;
+}
+/* The heading's # hangs in the left margin, so the title lines up with the text. */
+.cm-md-hang {
+  position: absolute;
+  white-space: pre;
+  right: calc(100% + 0.18em);
+}
+
+/* Lists: the marker hangs in the indent, wrapped text lines up with the first line. */
+.cm-editor .cm-line.cm-md-list {
+  position: relative;
+  padding-left: calc((var(--depth) + 1) * 1.4em);
+}
+.cm-editor .cm-line.cm-md-task {
+  padding-left: calc(var(--depth) * 1.4em + 27px);
+}
+.cm-md-lm {
+  position: absolute;
+  left: calc(var(--depth) * 1.4em);
+}
+/* Syntax marks take the document's deep tint, also inside links. */
+.cm-md-pi {
+  color: var(--tint-deep) !important;
+  font-weight: 500;
+}
+.cm-md-lm-dim,
+.cm-md-lm-dim * {
+  color: var(--ink-3) !important;
+  font-weight: 400 !important;
+}
+.cm-md-bullet {
+  left: calc(var(--depth) * 1.4em + 0.3em);
+  color: var(--ink-3);
+}
+.cm-md-box {
+  position: absolute;
+  left: calc(var(--depth) * 1.4em);
+  top: 6px;
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  border: 1.5px solid color-mix(in oklch, var(--ink-3) 70%, transparent);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.cm-md-box[aria-checked="true"] {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.cm-md-box svg {
+  width: 11px;
+  height: 11px;
+}
+.cm-editor .cm-line.cm-md-done {
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+/* Quotes: consecutive quote lines form one rounded block. */
+.cm-editor .cm-line.cm-md-quote {
+  padding: 0 16px;
+  background: var(--paper-soft);
+  color: var(--ink-2);
+}
+.cm-editor .cm-line.cm-md-quote-first {
+  padding-top: 10px;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+.cm-editor .cm-line.cm-md-quote-last {
+  padding-bottom: 10px;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+/* Code blocks: away from the cursor the fences shrink to padding and the language sits top right. */
+.cm-editor .cm-line.cm-md-code {
+  position: relative;
+  padding: 0 16px;
+  font: 13.5px/1.75 "SF Mono", ui-monospace, Menlo, monospace;
+  background: rgb(0 0 0 / 0.04);
+}
+.cm-editor .cm-line.cm-md-code-first {
+  padding-top: 4px;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+.cm-editor .cm-line.cm-md-code-last {
+  padding-bottom: 4px;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+.cm-editor .cm-line.cm-md-fence {
+  height: 10px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.cm-md-lang {
+  position: absolute;
+  right: 12px;
+  top: 8px;
+  font-size: 11.5px;
+  line-height: 1;
+  color: var(--ink-3);
+}
+.cm-md-icode {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.85em;
+  background: rgb(0 0 0 / 0.05);
+}
+.cm-md-icode .cm-md-icode {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.cm-md-mark {
+  background: var(--tint-mark);
+  border-radius: 3px;
+  padding: 1px 0;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.cm-md-autolink {
+  color: var(--blue);
+}
+/* The URL of a [text](url) link, seen on the cursor's line. */
+.cm-md-link .cm-md-url {
+  color: var(--ink-2);
+}
+.cm-md-plain,
+.cm-md-plain * {
+  color: inherit !important;
+}
+.cm-md-link:hover,
+.cm-md-autolink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cm-md-deep {
+  color: var(--tint-deep);
+}
+.cm-md-rule {
+  display: inline-block;
+  width: 100%;
+  vertical-align: middle;
+  border-top: 1px solid var(--line);
+}
+.cm-editor .cm-line.cm-md-table {
+  font: 14px/1.85 "SF Mono", ui-monospace, Menlo, monospace;
+}
+
+/* Images */
+.cm-md-img {
+  padding: 6px 0;
+}
+.cm-md-img img {
+  display: block;
+  max-width: 100%;
+  max-height: 520px;
+  border-radius: 12px;
+}
+.cm-md-img-pending img {
+  opacity: 0.5;
+}
+.cm-md-img-broken {
+  margin: 6px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--ink-3);
+  background: var(--quiet);
+}
+
+@media (prefers-color-scheme: dark) {
+  .cm-editor .cm-line.cm-md-code {
+    background: rgb(255 255 255 / 0.05);
+  }
+  .cm-md-icode {
+    background: rgb(255 255 255 / 0.07);
+  }
+}
+
+/*
+ * The selection is drawn above the text, blended like a highlighter, so it
+ * still shows over highlights, code and quote backgrounds.
+ */
+.cm-editor .cm-selectionLayer {
+  z-index: 1 !important;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+@media (prefers-color-scheme: dark) {
+  .cm-editor .cm-selectionLayer {
+    mix-blend-mode: screen;
+  }
+}
