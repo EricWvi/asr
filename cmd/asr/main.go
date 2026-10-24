@@ -16,6 +16,7 @@ import (
 	"asr"
 	"asr/internal/auth"
 	"asr/internal/config"
+	"asr/internal/dashscope"
 	"asr/internal/server"
 	"asr/internal/store"
 )
@@ -62,7 +63,13 @@ func run(configPath string) error {
 		ClientSecret: cfg.OIDC.ClientSecret,
 		DevUser:      cfg.DevUser,
 	})
-	handler, err := server.New(st, authn, asr.Frontend(), server.Options{Version: version})
+	opts := server.Options{Version: version}
+	if cfg.DashScope.Host != "" && cfg.DashScope.APIKey != "" {
+		opts.ASR = dashscope.New(cfg.DashScope.Host, cfg.DashScope.Model, cfg.DashScope.APIKey)
+	} else {
+		slog.Warn("dashscope host or api key is not set: speech recognition is off")
+	}
+	handler, err := server.New(st, authn, asr.Frontend(), opts)
 	if err != nil {
 		return err
 	}

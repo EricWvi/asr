@@ -5,6 +5,7 @@ import { drawSelection, EditorView, keymap } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { useEffect, useRef } from "react";
 
+import { dictation } from "@/editor/dictation";
 import { imageUpload } from "@/editor/images";
 import { dedentListItem, exitEmptyListItem, indentListItem } from "@/editor/lists";
 import { livePreview } from "@/editor/live-preview";
@@ -74,6 +75,7 @@ export function Editor({
           syntaxHighlighting(markdownStyle),
           livePreview,
           imageUpload,
+          dictation,
           // Ahead of the Markdown keymap, which has high precedence.
           Prec.highest(
             keymap.of([

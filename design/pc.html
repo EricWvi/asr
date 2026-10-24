@@ -377,6 +377,8 @@ svg { display: block; }
 .cm .ln.blank .caret { vertical-align: -0.35em; }
 .cm .fresh { text-decoration: underline 2px var(--tint-deep); text-underline-offset: 5px; text-decoration-skip-ink: none; }
 .cm .fresh.fading { animation: fresh-fade 1.2s ease 2.5s forwards; }
+/* 说话时的中间结果：淡色显示在插入点，不写进正文；松手拿到全部定稿后一次写入 */
+.cm .interim { color: var(--ink-3); }
 
 /* ---------- 语音 Dock ---------- */
 .dock {
@@ -408,6 +410,8 @@ svg { display: block; }
 .wave { display: none; align-items: center; gap: 3px; height: 18px; }
 .hold.rec .wave { display: inline-flex; }
 .hold.rec .mic { display: none; }
+/* 最后 30 秒显示剩余时间，到 5 分钟自动结束 */
+.hold .left { font-variant-numeric: tabular-nums; font-weight: 500; opacity: .8; }
 .wave i { width: 3px; border-radius: 2px; background: currentColor; animation: wave 0.9s ease-in-out infinite; }
 .wave i:nth-child(1) { animation-delay: -.8s } .wave i:nth-child(2) { animation-delay: -.6s }
 .wave i:nth-child(3) { animation-delay: -.4s } .wave i:nth-child(4) { animation-delay: -.2s }
@@ -648,6 +652,7 @@ kbd {
         <svg class="icon mic"><use href="#i-mic"/></svg>
         <span class="wave"><i></i><i></i><i></i><i></i><i></i></span>
         <span id="holdText">按住 空格 说话</span>
+        <span class="left" id="holdLeft" hidden>0:28</span>
       </button>
       <button class="dock-side"><svg class="icon"><use href="#i-return"/></svg>换行</button>
     </div>
@@ -798,8 +803,28 @@ const rec = (on) => {
   hold.classList.toggle('rec', on);
   $('holdText').textContent = on ? '松开结束' : '按住 空格 说话';
   // 松开后模拟一段新转写：下划线出现，几秒后淡掉
-  if (was && !on) { const f = $('fresh'); f.classList.remove('fading'); void f.offsetWidth; f.classList.add('fading'); }
+  if (on && !was) {
+    // 上一段转写的下划线早已淡掉
+    cm.querySelectorAll('.fresh').forEach((f) => f.classList.remove('fresh', 'fading'));
+    interim.textContent = '';
+    $('fresh-line').querySelector('.caret')?.before(interim);
+    let i = 0;
+    clearInterval(interimTimer);
+    interimTimer = setInterval(() => { i = Math.min(i + 3, spoken.length); interim.textContent = spoken.slice(0, i); }, 400);
+  }
+  if (was && !on) {
+    // 定稿：中间结果变成正文，刚写入的文字带下划线，几秒后淡掉
+    clearInterval(interimTimer);
+    $('holdLeft').hidden = true;
+    const text = interim.textContent; interim.remove();
+    if (!text) return;
+    const f = document.createElement('span'); f.className = 'fresh'; f.textContent = text;
+    caret.before(f); void f.offsetWidth; f.classList.add('fading');
+  }
 };
+const spoken = '接下来试试按住空格说话的手感，看看中间结果会不会跳';
+const interim = document.createElement('span'); interim.className = 'interim';
+let interimTimer;
 hold.onpointerdown = () => rec(true);
 hold.onpointerup = hold.onpointerleave = () => rec(false);
 
@@ -822,14 +847,24 @@ cm.addEventListener('click', (e) => {
 moveCursor($('fresh-line'));
 
 // 直接打开某个状态：pc.html#voice、#rec、#dark、#colors、#scrolled、#menu、#rename、#toast、#select、#only-sky、#listdown、#rose 等颜色名、
+// #countdown（录音最后 30 秒）、#asr-error、#mic-denied、#no-mic（语音模式的提示），
 // #source（落选变体）、#at-mark/li/task/quote/hr/code/table/img（光标所在行），可组合
 const hash = location.hash;
 if (hash.includes('source')) { cm.hidden = true; $('source-variant').hidden = false; }
 const at = hash.match(/at-(\w+)/);
 if (at) moveCursor(cm.querySelector(`[data-at="${at[1]}"]`));
 if (hash.includes('dark')) { root.dataset.theme = 'dark'; syncThemeIcon(); }
-if (hash.includes('voice') || hash.includes('rec')) setInput(true);
-if (hash.includes('rec')) rec(true);
+if (hash.includes('voice') || hash.includes('rec') || hash.includes('countdown')) setInput(true);
+if (hash.includes('rec') || hash.includes('countdown')) rec(true);
+if (hash.includes('rec') || hash.includes('countdown')) { clearInterval(interimTimer); interim.textContent = spoken; }
+if (hash.includes('countdown')) $('holdLeft').hidden = false;
+const voiceToasts = {
+  'asr-error': '识别中断，最后一句没有识别完',
+  'mic-denied': '没有麦克风权限，请在浏览器的网站设置里允许',
+  'no-mic': '没有找到麦克风',
+};
+const vt = Object.keys(voiceToasts).find((k) => hash.includes(k));
+if (vt) { setInput(true); $('toastText').textContent = voiceToasts[vt]; $('undoBtn').hidden = true; $('toast').hidden = false; }
 if (hash.includes('colors')) $('palette').hidden = false;
 const named = docs.find((d) => hash.includes(d.dataset.tint));
 if (named) named.click();

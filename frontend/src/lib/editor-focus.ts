@@ -44,3 +44,8 @@ export function focusEditor(where: Where = "end", doc: number | null = null) {
     apply(view, where);
   } else wanted = { where, doc };
 }
+
+/** The open document's editor, if it has mounted. */
+export function currentEditor() {
+  return view;
+}

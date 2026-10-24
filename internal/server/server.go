@@ -11,12 +11,15 @@ import (
 	"strings"
 
 	"asr/internal/auth"
+	"asr/internal/dashscope"
 	"asr/internal/store"
 )
 
 // Options are the settings the server passes on to the frontend.
 type Options struct {
 	Version string
+	// ASR recognizes speech; nil when it is not configured.
+	ASR *dashscope.Client
 }
 
 type server struct {
@@ -52,6 +55,7 @@ func New(st *store.Store, authn *auth.Service, web fs.FS, opts Options) (http.Ha
 	private.HandleFunc("POST /api/documents/{id}/restore", s.restoreDocument)
 	private.HandleFunc("POST /api/images", s.uploadImage)
 	private.HandleFunc("GET /api/images/{id}", s.getImage)
+	private.HandleFunc("GET /api/asr", s.recognize)
 	private.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "接口不存在")
 	})

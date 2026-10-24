@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AppToast } from "@/components/app-toast";
 import { Sheet } from "@/components/sheet";
 import { Sidebar } from "@/components/sidebar";
+import { VoiceDock } from "@/components/voice-dock";
 import { Button } from "@/components/ui/button";
 import { useDocuments } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-me";
@@ -58,13 +59,20 @@ export function App() {
 function Workspace() {
   const docs = useDocuments();
   const currentId = useWorkspace((s) => s.currentId);
+  const mode = useWorkspace((s) => s.mode);
   const current = docs.data?.find((d) => d.id === currentId);
 
   useEffect(() => {
     if (docs.data) ensureOpen(docs.data);
   }, [docs.data]);
 
-  if (current) return <Sheet doc={current} />;
+  if (current)
+    return (
+      <>
+        <Sheet doc={current} />
+        {mode === "voice" && <VoiceDock />}
+      </>
+    );
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-[880px] flex-1 items-center justify-center rounded-sheet border border-line bg-paper shadow-md">
       {docs.error && (

@@ -26,6 +26,11 @@ type testServer struct {
 
 func newTest(t *testing.T) *testServer {
 	t.Helper()
+	return newTestWith(t, Options{Version: "test"})
+}
+
+func newTestWith(t *testing.T, opts Options) *testServer {
+	t.Helper()
 	st, err := store.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -39,7 +44,7 @@ func newTest(t *testing.T) *testServer {
 		"sw.js":             {Data: []byte("self.addEventListener('fetch',()=>{})")},
 		".gitkeep":          {Data: nil},
 	}
-	h, err := New(st, authn, web, Options{Version: "test"})
+	h, err := New(st, authn, web, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
