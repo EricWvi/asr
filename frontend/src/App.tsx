@@ -1,8 +1,14 @@
+import { useEffect } from "react";
+
+import { AppToast } from "@/components/app-toast";
+import { Sheet } from "@/components/sheet";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
+import { useDocuments } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-me";
 import { ApiError } from "@/lib/api";
 import { goToLogin, useSession } from "@/lib/session";
+import { ensureOpen, useWorkspace } from "@/lib/workspace";
 
 export function App() {
   const signedOut = useSession((s) => s.signedOut);
@@ -41,11 +47,34 @@ export function App() {
   return (
     <div className="mx-auto grid h-full max-w-[1440px] grid-cols-[280px_1fr] py-4 pr-4">
       <Sidebar user={me.data} />
-      <main className="flex min-h-0 min-w-0 flex-col">
-        <div className="mx-auto flex min-h-0 w-full max-w-[880px] flex-1 items-center justify-center rounded-sheet border border-line bg-paper shadow-md">
-          <p className="text-[13px] text-ink-3">还没有文稿</p>
-        </div>
+      <main className="relative flex min-h-0 min-w-0 flex-col">
+        <Workspace />
+        <AppToast />
       </main>
+    </div>
+  );
+}
+
+function Workspace() {
+  const docs = useDocuments();
+  const currentId = useWorkspace((s) => s.currentId);
+  const current = docs.data?.find((d) => d.id === currentId);
+
+  useEffect(() => {
+    if (docs.data) ensureOpen(docs.data);
+  }, [docs.data]);
+
+  if (current) return <Sheet doc={current} />;
+  return (
+    <div className="mx-auto flex min-h-0 w-full max-w-[880px] flex-1 items-center justify-center rounded-sheet border border-line bg-paper shadow-md">
+      {docs.error && (
+        <p className="text-[13px] text-ink-3">
+          {docs.error.message}，
+          <button className="text-blue" onClick={() => void docs.refetch()}>
+            重试
+          </button>
+        </p>
+      )}
     </div>
   );
 }

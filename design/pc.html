@@ -368,6 +368,29 @@ kbd {
 .menu .danger:hover { background: color-mix(in oklch, var(--rec) 10%, transparent); }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
 
+/* 侧栏行内重命名：标题位置换成输入框，回车确认、Esc 取消 */
+.doc.renaming { background: var(--selected); }
+.rename {
+  display: block; width: calc(100% + 12px); height: 24px; margin: -2px -6px -1px; padding: 0 5px;
+  border: 0; border-radius: 6px; outline: none;
+  font: inherit; font-size: 13.5px; font-weight: 500; color: var(--ink);
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), 0 0 0 3px color-mix(in oklch, var(--accent) 22%, transparent);
+}
+.rename::selection { background: color-mix(in oklch, var(--accent) 24%, transparent); }
+
+/* 删除后的撤销提示：主区顶部居中，落在吸顶栏中间的空白处 */
+.toast {
+  position: absolute; left: 50%; top: 8px; z-index: 6; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px;
+  height: 44px; padding: 0 6px 0 16px; border-radius: 12px;
+  font-size: 13px; white-space: nowrap;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lg);
+}
+.toast-text { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.toast button { height: 32px; padding: 0 10px; border-radius: 8px; font-weight: 600; color: var(--accent); transition: background .15s; }
+.toast button:hover { background: color-mix(in oklch, var(--accent) 10%, transparent); }
+
 [hidden] { display: none !important; }
 </style>
 </head>
@@ -511,15 +534,20 @@ kbd {
       </button>
       <button class="dock-side"><svg class="icon"><use href="#i-return"/></svg>换行</button>
     </div>
+
+    <div class="toast" id="toast" role="status" hidden>
+      <span class="toast-text" id="toastText">已删除「2026/10/24 09:15」</span>
+      <button id="undoBtn">撤销</button>
+    </div>
   </main>
 </div>
 
 <div class="menu" id="menu" role="menu" hidden>
-  <button role="menuitem"><svg class="icon"><use href="#i-edit"/></svg>重命名</button>
+  <button role="menuitem" id="renameItem"><svg class="icon"><use href="#i-edit"/></svg>重命名</button>
   <button role="menuitem"><svg class="icon"><use href="#i-copy"/></svg>复制 Markdown</button>
   <button role="menuitem"><svg class="icon"><use href="#i-download"/></svg>导出 .md 文件</button>
   <hr>
-  <button role="menuitem" class="danger"><svg class="icon"><use href="#i-trash"/></svg>删除</button>
+  <button role="menuitem" class="danger" id="deleteItem"><svg class="icon"><use href="#i-trash"/></svg>删除</button>
 </div>
 
 <script>
@@ -560,7 +588,7 @@ addEventListener('resize', syncMore);
 let filter = null;
 const fdots = [...document.querySelectorAll('.fdot')];
 const applyFilter = () => {
-  docs.forEach((d) => { d.hidden = !!filter && d.dataset.tint !== filter; });
+  docs.forEach((d) => { d.hidden = !!d.dataset.deleted || (!!filter && d.dataset.tint !== filter); });
   document.querySelectorAll('.docs .group').forEach((g) => {
     let el = g.nextElementSibling, any = false;
     while (el && el.classList.contains('doc')) { any ||= !el.hidden; el = el.nextElementSibling; }
@@ -606,7 +634,35 @@ const openMenu = (doc, x, y) => {
   m.style.left = Math.min(x, innerWidth - m.offsetWidth - 8) + 'px';
   m.style.top = Math.min(y, innerHeight - m.offsetHeight - 8) + 'px';
 };
-docs.forEach((d) => d.oncontextmenu = (e) => { e.preventDefault(); openMenu(d, e.clientX, e.clientY); });
+docs.forEach((d) => d.oncontextmenu = (e) => { e.preventDefault(); menuDoc = d; openMenu(d, e.clientX, e.clientY); });
+// 右键菜单：重命名在侧栏行内编辑；删除后弹出撤销提示，几秒后自动消失
+let menuDoc = null;
+const startRename = (doc) => {
+  const t = doc.querySelector('.doc-title');
+  const input = document.createElement('input');
+  input.className = 'rename'; input.value = t.textContent;
+  t.hidden = true; t.after(input); doc.classList.add('renaming');
+  input.focus(); input.select();
+  const done = (save) => {
+    if (save && input.value.trim()) t.textContent = input.value.trim();
+    input.remove(); t.hidden = false; doc.classList.remove('renaming');
+  };
+  input.onkeydown = (e) => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
+  input.onblur = () => done(true);
+  input.onclick = (e) => e.stopPropagation();
+};
+let toastTimer;
+const deleteDoc = (doc) => {
+  doc.hidden = true; doc.dataset.deleted = '1';
+  $('toastText').textContent = `已删除「${doc.querySelector('.doc-title').textContent}」`;
+  $('toast').hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; }, 6000);
+  $('undoBtn').onclick = () => { delete doc.dataset.deleted; doc.hidden = false; $('toast').hidden = true; applyFilter(); };
+  applyFilter();
+};
+$('renameItem').onclick = () => { const d = menuDoc; setTimeout(() => startRename(d)); };
+$('deleteItem').onclick = () => deleteDoc(menuDoc);
+
 document.addEventListener('click', closeMenu);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
 $('sheet').addEventListener('scroll', closeMenu);
@@ -630,7 +686,7 @@ const rec = (on) => {
 hold.onpointerdown = () => rec(true);
 hold.onpointerup = hold.onpointerleave = () => rec(false);
 
-// 直接打开某个状态：pc.html#voice、#rec、#dark、#colors、#scrolled、#menu、#select、#only-sky、#listdown、#rose 等颜色名，可组合
+// 直接打开某个状态：pc.html#voice、#rec、#dark、#colors、#scrolled、#menu、#rename、#toast、#select、#only-sky、#listdown、#rose 等颜色名，可组合
 const hash = location.hash;
 if (hash.includes('dark')) { root.dataset.theme = 'dark'; syncThemeIcon(); }
 if (hash.includes('voice') || hash.includes('rec')) setInput(true);
@@ -639,6 +695,8 @@ if (hash.includes('colors')) $('palette').hidden = false;
 const named = docs.find((d) => hash.includes(d.dataset.tint));
 if (named) named.click();
 if (hash.includes('menu')) { const r = docs[1].getBoundingClientRect(); openMenu(docs[1], r.left + 120, r.top + 24); }
+if (hash.includes('rename')) startRename(docs[2]);
+if (hash.includes('toast')) deleteDoc(docs[1]);
 if (hash.includes('scrolled')) $('sheet').scrollTop = 420;
 if (hash.includes('listdown')) docList.scrollTop = 560;
 syncMore();

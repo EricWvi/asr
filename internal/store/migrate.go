@@ -38,6 +38,22 @@ var migrations = []migration{
 	);
 	CREATE INDEX sessions_user ON sessions (user_id);
 	`),
+	execSQL(`
+	-- Times are Unix milliseconds. A deleted document keeps its row until
+	-- the trash is purged, so the delete can be undone.
+	CREATE TABLE documents (
+		id         INTEGER PRIMARY KEY,
+		user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		title      TEXT    NOT NULL,
+		color      TEXT    NOT NULL,
+		content    TEXT    NOT NULL DEFAULT '',
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL,
+		deleted_at INTEGER
+	);
+	CREATE INDEX documents_user ON documents (user_id, updated_at DESC) WHERE deleted_at IS NULL;
+	CREATE INDEX documents_deleted ON documents (deleted_at) WHERE deleted_at IS NOT NULL;
+	`),
 }
 
 func migrate(db *sql.DB) error {

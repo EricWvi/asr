@@ -1,9 +1,14 @@
-import { MicIcon } from "lucide-react";
+import { FilePlusIcon, MicIcon } from "lucide-react";
 
+import { DocList } from "@/components/doc-list";
 import { UserMenu } from "@/components/user-menu";
-import type { User } from "@/lib/api";
+import { COLORS, type User } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { newDocument, useWorkspace } from "@/lib/workspace";
 
 export function Sidebar({ user }: { user: User }) {
+  const filter = useWorkspace((s) => s.filter);
+
   return (
     <aside className="flex min-h-0 flex-col pt-2 pr-3 pl-4">
       <div className="flex items-center gap-2.5 px-1.5 pt-0.5 pb-[18px]">
@@ -13,9 +18,44 @@ export function Sidebar({ user }: { user: User }) {
         <div className="font-serif text-base leading-none font-semibold tracking-[.06em]">听写</div>
       </div>
 
-      <div className="flex items-center justify-between pt-3.5 pr-1 pb-1 pl-2.5 text-[13px] font-semibold">文稿</div>
-      <div className="flex-1" />
+      <button
+        className="flex h-9 w-full items-center gap-2.5 rounded-item px-2.5 text-left transition-colors hover:bg-hover"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => void newDocument()}
+      >
+        <FilePlusIcon className="size-4 text-ink-2" strokeWidth={1.75} />
+        新建文稿
+      </button>
 
+      <div className="flex items-center justify-between pt-3.5 pr-1 pb-1 pl-2.5 text-[13px] font-semibold">
+        <span>文稿</span>
+        {/* Filter by colour: one click shows only that colour, a second click clears it. */}
+        <div className="flex">
+          {COLORS.map((c) => (
+            <button
+              key={c}
+              title="只看这种颜色"
+              aria-pressed={filter === c}
+              className={cn(`tint-${c}`, "group grid size-[22px] place-items-center")}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => useWorkspace.setState({ filter: filter === c ? null : c })}
+            >
+              <span
+                className={cn(
+                  "size-2.5 rounded-full bg-tint-fill shadow-[inset_0_0_0_1px_rgb(0_0_0/0.08)] transition-[transform,opacity,box-shadow]",
+                  "group-hover:scale-120",
+                  filter !== null &&
+                    (filter === c
+                      ? "shadow-[0_0_0_2px_var(--bg),0_0_0_3.5px_var(--tint-deep)]"
+                      : "opacity-35 group-hover:opacity-70"),
+                )}
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <DocList />
       <UserMenu user={user} />
     </aside>
   );

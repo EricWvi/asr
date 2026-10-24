@@ -44,6 +44,12 @@ func New(st *store.Store, authn *auth.Service, web fs.FS, opts Options) (http.Ha
 	mux.Handle("/", static)
 
 	private.HandleFunc("GET /api/me", s.getMe)
+	private.HandleFunc("GET /api/documents", s.listDocuments)
+	private.HandleFunc("POST /api/documents", s.createDocument)
+	private.HandleFunc("GET /api/documents/{id}", s.getDocument)
+	private.HandleFunc("PATCH /api/documents/{id}", s.updateDocument)
+	private.HandleFunc("DELETE /api/documents/{id}", s.deleteDocument)
+	private.HandleFunc("POST /api/documents/{id}/restore", s.restoreDocument)
 	private.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "接口不存在")
 	})
@@ -78,8 +84,11 @@ func detail(err, sentinel error) string {
 	return strings.TrimPrefix(err.Error(), sentinel.Error()+": ")
 }
 
-func decode(w http.ResponseWriter, r *http.Request, v any) bool {
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256<<10)).Decode(v); err != nil {
+// defaultBody caps request bodies that carry no document content.
+const defaultBody = 256 << 10
+
+func decode(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit)).Decode(v); err != nil {
 		writeError(w, http.StatusBadRequest, "请求格式不正确")
 		return false
 	}

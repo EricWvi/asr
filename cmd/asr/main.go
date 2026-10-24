@@ -74,6 +74,7 @@ func run(configPath string) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go purgeTrash(ctx, st)
 
 	errc := make(chan error, 1)
 	go func() {
@@ -92,4 +93,24 @@ func run(configPath string) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// purgeTrash removes documents that have been in the trash longer than
+// store.TrashRetention, once at startup and then hourly.
+func purgeTrash(ctx context.Context, st *store.Store) {
+	tick := time.NewTicker(time.Hour)
+	defer tick.Stop()
+	for {
+		n, err := st.PurgeDeleted(ctx, time.Now().Add(-store.TrashRetention))
+		if err != nil && ctx.Err() == nil {
+			slog.Error("purge trash", "err", err)
+		} else if n > 0 {
+			slog.Info("purged deleted documents", "count", n)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
 }

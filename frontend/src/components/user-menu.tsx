@@ -1,10 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { LogOutIcon } from "lucide-react";
-import { toast } from "sonner";
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { logout, type User } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { notifyError } from "@/lib/toast";
 
 export function UserMenu({ user }: { user: User }) {
   const queryClient = useQueryClient();
@@ -15,7 +15,7 @@ export function UserMenu({ user }: { user: User }) {
     try {
       await logout();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "退出登录失败");
+      notifyError(err, "退出登录失败");
       return;
     }
     setSignedOut(true);

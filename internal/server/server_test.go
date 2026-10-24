@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -144,8 +145,7 @@ func TestCrossOriginWritesAreRejected(t *testing.T) {
 		{origin, http.StatusNotFound},
 		{"", http.StatusNotFound},
 	} {
-		// No write endpoint exists yet; passing the origin check reaches
-		// the API's not-found handler.
+		// Passing the origin check reaches the API's not-found handler.
 		req := httptest.NewRequest("POST", "/api/nope", strings.NewReader(`{}`))
 		req.AddCookie(&http.Cookie{Name: "asr_session", Value: h.session})
 		if tc.origin != "" {
@@ -176,5 +176,58 @@ func TestLogoutEndsOnlyThisSession(t *testing.T) {
 	h.session = other
 	if rec := do(t, h, "GET", "/api/me", ""); rec.Code != http.StatusOK {
 		t.Fatalf("other browser: status = %d", rec.Code)
+	}
+}
+
+func TestDocumentsAPI(t *testing.T) {
+	h := newTest(t)
+	rec := do(t, h, "POST", "/api/documents", `{"title":"2026/10/24 14:32","color":"sky"}`)
+	var d store.Document
+	if rec.Code != http.StatusCreated || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.ID == 0 || d.Color != "sky" {
+		t.Fatalf("create: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	path := fmt.Sprintf("/api/documents/%d", d.ID)
+
+	rec = do(t, h, "PATCH", path, `{"content":"# 标题\n正文"}`)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"snippet":"标题"`) {
+		t.Fatalf("patch: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	rec = do(t, h, "GET", path, "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"content":"# 标题\n正文"`) {
+		t.Fatalf("get: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, h, "PATCH", path, `{"color":"red"}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("bad color: status = %d", rec.Code)
+	}
+
+	// Another user cannot see or touch it.
+	alice := h.session
+	h.session = h.signIn(t, "bob")
+	if rec := do(t, h, "GET", "/api/documents", ""); rec.Body.String() != "[]\n" {
+		t.Errorf("bob's list = %s", rec.Body)
+	}
+	for _, m := range []string{"GET", "PATCH", "DELETE"} {
+		if rec := do(t, h, m, path, `{"title":"x"}`); rec.Code != http.StatusNotFound {
+			t.Errorf("bob %s: status = %d", m, rec.Code)
+		}
+	}
+	h.session = alice
+
+	if rec := do(t, h, "DELETE", path, ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete: status = %d", rec.Code)
+	}
+	if rec := do(t, h, "GET", path, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("get deleted: status = %d", rec.Code)
+	}
+	if rec := do(t, h, "POST", path+"/restore", ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("restore: status = %d", rec.Code)
+	}
+	var docs []store.Document
+	json.Unmarshal(do(t, h, "GET", "/api/documents", "").Body.Bytes(), &docs)
+	if len(docs) != 1 || docs[0].ID != d.ID {
+		t.Fatalf("list = %+v", docs)
+	}
+	if rec := do(t, h, "GET", "/api/documents/abc", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("bad id: status = %d", rec.Code)
 	}
 }
