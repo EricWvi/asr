@@ -20,17 +20,43 @@
 
 在 .tmp 下写一次性脚本，不进仓库。
 
-- [ ] 用 3–5 秒 16 kHz 单声道 PCM 调用 `qwen-audio-3.1-asr-flash-message`，走 `/inference` 的 `run-task → 二进制音频帧 → finish-task`，确认 `result-generated` 的中间结果和 `sentence_end`，以及最后的 `task-finished`。
-- [ ] 记录实测数据：首字延迟、单次任务的最长时长、`language_hints: ["zh"]` 和 `disfluency_removal_enabled` 的效果。
-- [ ] 调用一次 DeepSeek API，用 1.md 那种口语稿试整理提示词，确认输出只有整理后的正文，不带解释。
-- 需要 Eric 提供：DashScope API Key 和 WorkspaceId（以及地域），DeepSeek API Key。
+- [x] 用 16 kHz 单声道 PCM 调用 `qwen-audio-3.1-asr-flash-message`，走 `/inference` 的 `run-task → 二进制音频帧 → finish-task`，流式识别正常。
+- [x] 记录实测数据，见下方「ASR 实测」。
+- [x] 调用 DeepSeek API 试整理提示词，见下方「整理实测」。
+
+### ASR 实测（2026-10-24，北京）
+
+- 地址是 `wss://<host>/api-ws/v1/inference`，host 已经包含业务空间和地域，所以配置里只需要 host。
+- 延迟：连接加 `task-started` 约 0.2–0.26 秒；开始说话约 0.5 秒后出第一批字，之后大约每 0.4 秒更新一次；音频结束后 0.04–0.4 秒拿到定稿和 `task-finished`。
+- 中间结果每次都是整句全文，按 `sentence_id` 替换，不能累加。最早几条可能是空字符串。
+- 服务端自带 VAD：停顿约 1.5 秒就会断句，同一次任务里会有多个 `sentence_id`。前端一次按住说话可能拿到多句定稿，要按顺序拼接。
+- 定稿可能和中间结果不一样，甚至为空：0.3 秒的短音频，中间结果是「嗯，」，定稿是空字符串。一律以 `sentence_end=true` 的文本为准，空的就丢弃。
+- 只有静音时，会收到一条空定稿，然后正常 `task-finished`，不报错。
+- 74 秒连续推流正常，没有遇到时长上限。更长的时长没有测，实现时设一个上限（例如 5 分钟）。
+- 数字会被规整成阿拉伯数字（「三点」→「3点」），标点会自动加。
+- `disfluency_removal_enabled: true` 会去掉「嗯」这类口头语，打开。口语到书面语的梳理交给「整理」。`language_hints: ["zh"]` 对普通话结果没有可见差别，保留。
+- `task-finished` 的 `usage.duration` 是计费秒数，可以记到日志里。
+
+### 整理实测（2026-10-24）
+
+「整理」的含义：把口语稿梳理成规范的书面 Markdown，保留全部信息，不总结。提示词原型在 .tmp/asr-probe/tidy.py。
+
+- 可用模型：`deepseek-flash`（V4.1-Flash）和 `deepseek-v4-pro`，接口是 OpenAI 兼容的 `https://api.deepseek.com/chat/completions`。
+- 一段约 300 字、带改口和待办的口语稿：
+  - `deepseek-flash`（默认思考）：首字 2.2 秒，总计 2.9 秒。结构合理，改口取后者，待办识别成 `- [ ]`，信息没有遗漏。
+  - `deepseek-v4-pro`：总计 14 秒，效果和 flash 差不多，不划算。
+  - `deepseek-flash` 关闭思考（`thinking: {type: disabled}`）：1.3–1.7 秒，但会过度分节，还会调换原文顺序。不采用。
+  - `reasoning_effort: "low"` 没有明显提速。
+- 一句话的短稿只修语句，不硬加结构，耗时约 1 秒。
+- 结论：默认用 `deepseek-flash`，开启思考，流式返回。思考阶段约 2 秒，前端要显示「整理中」。
+- 实现时要把待整理段落之前的标题结构作为只读上下文传进去，让新加的标题层级和文稿已有的衔接。
 
 ## 阶段 1：工程骨架与登录
 
 - [ ] Go 模块 `asr`，目录结构和 homepage 一致：`cmd/asr`、`internal/{config,auth,store,server}`、`frontend/`，前端产物用 `frontend.go` 嵌入二进制。
 - [ ] 照搬 homepage 的 auth：session、登录 Cookie、`/auth/login`、`/auth/callback`、`/auth/logout`、同源检查、`dev_user`。Cookie 名改成 `asr_*`。
 - [ ] 照搬 store 的用户和 session 表及迁移机制。
-- [ ] config.example.yaml 在 homepage 的基础上新增 `dashscope`（api_key、workspace_id、region、model）和 `deepseek`（api_key、model）。密钥优先从环境变量读取，例如 `ASR_DASHSCOPE_API_KEY`。
+- [ ] config.example.yaml 在 homepage 的基础上新增 `dashscope`（host、api_key、model）和 `deepseek`（api_key、model，默认 `deepseek-flash`）。密钥优先从环境变量读取，即 `ASR_DASHSCOPE_API_KEY` 和 `ASR_DEEPSEEK_API_KEY`，本地开发放在 `.env`。
 - [ ] Taskfile：install、build、format、lint、test，和 homepage 保持一致。
 - [ ] 前端脚手架：vite、React 19、Tailwind 4、shadcn、React Query、zustand。从 design/pc.html 抽出设计 token（颜色、圆角、阴影、六种文稿颜色及 fill/deep/sel/mark 派生），放进 CSS 变量，亮暗两套。
 - [ ] Dockerfile 和 CI 构建镜像（不在本地构建）。到 Authelia 注册 client，redirect 是 `<public_url>/auth/callback`。
@@ -73,7 +99,7 @@
 ## 阶段 5：整理（DeepSeek）
 
 - [ ] 记录转写区间：每次定稿后标记一个区间，随编辑映射位置；用户手动改过的区间就移除标记。区间和文稿一起持久化，刷新页面后还在。
-- [ ] 后端 `/api/tidy`：代理 DeepSeek，流式返回结果。
+- [ ] 后端 `/api/tidy`：代理 DeepSeek，流式返回结果。提示词从 .tmp/asr-probe/tidy.py 移进代码，附带文稿已有的标题结构作为上下文。
 - [ ] 点「整理」后，把上次整理之后的待整理区间发出去，结果原地替换，之后清空标记。整理是一次可以撤销的事务。
 - [ ] 没有待整理内容时，按钮禁用，悬停时说明原因。
 
