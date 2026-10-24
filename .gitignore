@@ -4,7 +4,8 @@ logs
 
 # Dependencies and build output
 node_modules/
-dist/
+**/dist/*
+!frontend/dist/.gitkeep
 dist-ssr/
 /target/
 *.tsbuildinfo
@@ -19,6 +20,9 @@ dist-ssr/
 .vscode/*
 *.sw?
 /.data/
+/data/
+/release/
+config.yaml
 .tmp/
 
 # Independent memory repository

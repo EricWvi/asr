@@ -1,0 +1,34 @@
+# HTTP listen address
+listen: ":36750"
+# Directory for the SQLite database and uploaded files
+data_dir: "./data"
+
+# Origin browsers use to reach this site. The OIDC redirect URI is
+# <public_url>/auth/callback and must be registered with the provider.
+public_url: "https://asr.example.com"
+
+# Authelia (or any OIDC provider) confidential client.
+oidc:
+  issuer: "https://auth.example.com"
+  client_id: "asr"
+  # Prefer the ASR_OIDC_CLIENT_SECRET environment variable.
+  client_secret: ""
+
+# Speech recognition on Alibaba Cloud Model Studio (DashScope).
+dashscope:
+  # Workspace endpoint host; it already names the workspace and region.
+  host: "llm-xxxxxxxx.cn-beijing.maas.aliyuncs.com"
+  model: "qwen-audio-3.1-asr-flash-message"
+  # Prefer the ASR_DASHSCOPE_API_KEY environment variable.
+  api_key: ""
+
+# Chat model that tidies transcripts into written Markdown. Any
+# OpenAI-compatible API works; requests go to <base_url>/chat/completions.
+tidy:
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-flash"
+  # Prefer the ASR_TIDY_API_KEY environment variable.
+  api_key: ""
+
+# Local development only: skip OIDC and sign every request in as this user.
+# dev_user: "eric"

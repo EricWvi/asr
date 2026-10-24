@@ -1,0 +1,201 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * Tokens follow design/pc.html. Visual reference is Craft: a warm white
+ * page, a cream paper sheet, large radii and soft diffuse shadows. Blue is
+ * the interaction accent; red marks recording. Colours follow the system
+ * theme.
+ */
+:root {
+  color-scheme: light dark;
+
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --ink: #1d1d1f;
+  --ink-2: #6e6e73;
+  --ink-3: #a1a1a6;
+  --line: #ebe8e3;
+  --hover: rgb(0 0 0 / 0.035);
+  --selected: rgb(0 0 0 / 0.06);
+  --quiet: rgb(0 0 0 / 0.05);
+  --chip: #f2f1ef;
+  --blue: #1a7cf5;
+  --rec: #f2544b;
+
+  --radius-sheet: 20px;
+  --radius-item: 10px;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05), 0 2px 8px -2px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px -10px rgb(0 0 0 / 0.14);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.04), 0 24px 56px -16px rgb(0 0 0 / 0.22);
+
+  /* Document pastels: each document picks one. */
+  --butter: #fbe69b;
+  --peach: #ffd5bd;
+  --rose: #f8c8da;
+  --periwinkle: #b6c4f4;
+  --sky: #a8d9f1;
+  --mint: #c6eac9;
+
+  /* Every document sits on the same cream paper (butter mixed 10% into white). */
+  --paper: color-mix(in oklch, var(--butter) 10%, #fff);
+  --paper-soft: color-mix(in oklch, var(--butter) 32%, #fff);
+  --paper-line: color-mix(in oklch, var(--butter) 45%, var(--line));
+
+  /* shadcn/ui variables, mapped onto the tokens above. */
+  --radius: 0.75rem;
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--blue);
+  --primary-foreground: #fff;
+  --secondary: var(--chip);
+  --secondary-foreground: var(--ink);
+  --muted: var(--chip);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--hover);
+  --accent-foreground: var(--ink);
+  --destructive: var(--rec);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--blue);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1b1d;
+    --surface: #2a2a2d;
+    --ink: #f2f2f4;
+    --ink-2: #a0a0a7;
+    --ink-3: #6c6c72;
+    --line: #3a3a3e;
+    --hover: rgb(255 255 255 / 0.04);
+    --selected: rgb(255 255 255 / 0.08);
+    --quiet: rgb(255 255 255 / 0.06);
+    --chip: #36363a;
+    --blue: #3b8ef7;
+    --rec: #ff6258;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -10px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 24px 56px -16px rgb(0 0 0 / 0.6);
+
+    /* In dark mode the paper is close to neutral. */
+    --paper: color-mix(in oklch, var(--butter) 3%, var(--surface));
+    --paper-soft: color-mix(in oklch, var(--butter) 8%, var(--surface));
+    --paper-line: color-mix(in oklch, var(--butter) 18%, var(--line));
+  }
+}
+
+/*
+ * A document's pastel --tint and what is derived from it:
+ *   fill  sidebar swatch and filter dots
+ *   deep  Markdown syntax marks and the fresh-transcript underline, dark
+ *         enough to read on the cream paper
+ *   sel   selected text background, light and translucent
+ *   mark  ==highlight== background, a solid mid-strength colour
+ */
+.tint-butter { --tint: var(--butter); }
+.tint-peach { --tint: var(--peach); }
+.tint-rose { --tint: var(--rose); }
+.tint-periwinkle { --tint: var(--periwinkle); }
+.tint-sky { --tint: var(--sky); }
+.tint-mint { --tint: var(--mint); }
+[class*="tint-"] {
+  --tint-fill: var(--tint);
+  --tint-deep: oklch(from var(--tint) 0.6 calc(c * 1.8) h);
+  --tint-sel: oklch(from var(--tint) l c h / 0.45);
+  --tint-mark: var(--tint);
+}
+@media (prefers-color-scheme: dark) {
+  [class*="tint-"] {
+    --tint-fill: color-mix(in oklch, var(--tint) 62%, var(--bg));
+    --tint-deep: oklch(from var(--tint) 0.8 calc(c * 1.4) h);
+    --tint-sel: oklch(from var(--tint) 0.55 calc(c * 0.9) h / 0.45);
+    --tint-mark: color-mix(in oklch, var(--tint) 34%, var(--surface));
+  }
+}
+
+@theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-serif: "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sheet: var(--radius-sheet);
+  --radius-item: var(--radius-item);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-hover: var(--hover);
+  --color-selected: var(--selected);
+  --color-quiet: var(--quiet);
+  --color-chip: var(--chip);
+  --color-blue: var(--blue);
+  --color-rec: var(--rec);
+  --color-paper: var(--paper);
+  --color-paper-soft: var(--paper-soft);
+  --color-paper-line: var(--paper-line);
+  --color-butter: var(--butter);
+  --color-peach: var(--peach);
+  --color-rose: var(--rose);
+  --color-periwinkle: var(--periwinkle);
+  --color-sky: var(--sky);
+  --color-mint: var(--mint);
+  --color-tint: var(--tint);
+  --color-tint-fill: var(--tint-fill);
+  --color-tint-deep: var(--tint-deep);
+  --color-tint-sel: var(--tint-sel);
+  --color-tint-mark: var(--tint-mark);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  button:focus:not(:focus-visible) {
+    outline: none;
+  }
+}

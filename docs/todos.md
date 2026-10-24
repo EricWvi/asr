@@ -53,14 +53,16 @@
 
 ## 阶段 1：工程骨架与登录
 
-- [ ] Go 模块 `asr`，目录结构和 homepage 一致：`cmd/asr`、`internal/{config,auth,store,server}`、`frontend/`，前端产物用 `frontend.go` 嵌入二进制。
-- [ ] 照搬 homepage 的 auth：session、登录 Cookie、`/auth/login`、`/auth/callback`、`/auth/logout`、同源检查、`dev_user`。Cookie 名改成 `asr_*`。
-- [ ] 照搬 store 的用户和 session 表及迁移机制。
-- [ ] config.example.yaml 在 homepage 的基础上新增 `dashscope`（host、api_key、model）和 `deepseek`（api_key、model，默认 `deepseek-flash`）。密钥优先从环境变量读取，即 `ASR_DASHSCOPE_API_KEY` 和 `ASR_DEEPSEEK_API_KEY`，本地开发放在 `.env`。
-- [ ] Taskfile：install、build、format、lint、test，和 homepage 保持一致。
-- [ ] 前端脚手架：vite、React 19、Tailwind 4、shadcn、React Query、zustand。从 design/pc.html 抽出设计 token（颜色、圆角、阴影、六种文稿颜色及 fill/deep/sel/mark 派生），放进 CSS 变量，亮暗两套。
-- [ ] Dockerfile 和 CI 构建镜像（不在本地构建）。到 Authelia 注册 client，redirect 是 `<public_url>/auth/callback`。
-- [ ] docs/business-rules.md：参照 homepage，写业务概念与规则，不涉及实现方式。
+- [x] Go 模块 `asr`，目录结构和 homepage 一致：`cmd/asr`、`internal/{config,auth,store,server}`、`frontend/`，前端产物用 `frontend.go` 嵌入二进制。
+- [x] 照搬 homepage 的 auth：session、登录 Cookie、`/auth/login`、`/auth/callback`、`/auth/logout`、同源检查、`dev_user`。Cookie 名改成 `asr_*`。
+- [x] 照搬 store 的用户和 session 表及迁移机制。
+- [x] 前端登录流程：未登录跳转统一认证，退出后停在「已退出登录」页；拦截 `beforeinstallprompt`，不提供 manifest。
+- [x] config.example.yaml 在 homepage 的基础上新增 `dashscope`（host、api_key、model）和 `tidy`（base_url、model、api_key，OpenAI 兼容接口，不绑定 DeepSeek）。密钥优先从环境变量读取，即 `ASR_DASHSCOPE_API_KEY` 和 `ASR_TIDY_API_KEY`，本地开发放在 `.env`。开发用的 `config.yaml` 设置 `dev_user`，不走 OIDC，不进仓库。
+- [x] Taskfile：install、build、format、lint、test，和 homepage 保持一致。
+- [x] 前端脚手架：vite、React 19、Tailwind 4、shadcn、React Query、zustand。从 design/pc.html 抽出设计 token（颜色、圆角、阴影、六种文稿颜色及 fill/deep/sel/mark 派生），放进 CSS 变量，亮暗两套。
+- [x] Dockerfile 和 CI 构建镜像（推 `v*` 标签后由 GitHub Actions 构建，不在本地构建）。
+- [ ] 到 Authelia 注册 client，redirect 是 `<public_url>/auth/callback`，并确定线上域名（Eric）。
+- [x] docs/business-rules.md：参照 homepage，写业务概念与规则，不涉及实现方式。
 
 ## 阶段 2：文稿与 PC 布局（键盘模式）
 
@@ -96,10 +98,10 @@
 - [ ] 换行按钮另起一行。
 - [ ] 麦克风权限被拒或没有设备时，给出提示。
 
-## 阶段 5：整理（DeepSeek）
+## 阶段 5：整理
 
 - [ ] 记录转写区间：每次定稿后标记一个区间，随编辑映射位置；用户手动改过的区间就移除标记。区间和文稿一起持久化，刷新页面后还在。
-- [ ] 后端 `/api/tidy`：代理 DeepSeek，流式返回结果。提示词从 .tmp/asr-probe/tidy.py 移进代码，附带文稿已有的标题结构作为上下文。
+- [ ] 后端 `/api/tidy`：调用 `tidy.base_url` 的 OpenAI 兼容接口，流式返回结果。代码只发标准字段（`model`、`messages`、`stream`）；厂商专有参数（如 DeepSeek 的 `thinking`）放在配置 `tidy.extra_body`，原样合并进请求体，与标准字段冲突时以代码为准。当前 `deepseek-flash` 默认开启思考，`extra_body` 可以不填。提示词从 .tmp/asr-probe/tidy.py 移进代码，附带文稿已有的标题结构作为上下文。
 - [ ] 点「整理」后，把上次整理之后的待整理区间发出去，结果原地替换，之后清空标记。整理是一次可以撤销的事务。
 - [ ] 没有待整理内容时，按钮禁用，悬停时说明原因。
 
