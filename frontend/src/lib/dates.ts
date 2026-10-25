@@ -34,3 +34,22 @@ export function shortTime(d: Date, now = new Date()) {
   if (d.getFullYear() === now.getFullYear()) return `${d.getMonth() + 1}月${d.getDate()}日 ${clock(d)}`;
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
+
+/** When a device was last used, e.g. 「3 分钟前使用」. */
+export function usedAgo(d: Date, now = new Date()) {
+  const minutes = Math.floor((now.getTime() - d.getTime()) / 60_000);
+  if (minutes < 1) return "刚刚使用";
+  if (minutes < 60) return `${minutes} 分钟前使用`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} 小时前使用`;
+  const days = dayDiff(d, now);
+  if (days <= 30) return `${days} 天前使用`;
+  return `${monthDay(d, now)}使用`;
+}
+
+/** The day a device signed in, e.g. 「10 月 20 日登录」. */
+export function signedInOn(d: Date, now = new Date()) {
+  return `${monthDay(d, now)}登录`;
+}
+
+const monthDay = (d: Date, now: Date) =>
+  `${d.getFullYear() === now.getFullYear() ? "" : `${d.getFullYear()} 年 `}${d.getMonth() + 1} 月 ${d.getDate()} 日`;

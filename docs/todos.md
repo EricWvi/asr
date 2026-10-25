@@ -166,13 +166,28 @@
 
 ## 阶段 8：设备 token 与推送通道
 
-- [ ] devices 表：设备名、平台、token 哈希、最近使用时间。
-- [ ] 原生客户端登录：客户端打开系统浏览器访问 `/auth/device/login`，走同一套 OIDC，回调后通过自定义 scheme（安卓）或 loopback（Mac）把 token 交回客户端。需要防 CSRF，code 只能用一次。
-- [ ] API 同时接受 Cookie session 和 `Authorization: Bearer <设备 token>`。
-- [ ] 网页端设备管理：查看设备并吊销。
-- [ ] 用户级 WebSocket 推送：Mac 客户端常驻连接，并上报最近一次键盘鼠标活动时间。
-- [ ] 「发送到电脑」默认推给最近活跃的那台 Mac，安卓端可以手动切换目标。没有 Mac 在线时直接返回失败，不排队。
-- [ ] 发送的是识别原文，不整理，服务端不留存。
+- [x] devices 表：设备名、平台、token 哈希、最近使用时间。
+- [x] 原生客户端登录：客户端打开系统浏览器访问 `/auth/device/login`，走同一套 OIDC，回调后通过自定义 scheme（安卓）或 loopback（Mac）把 token 交回客户端。需要防 CSRF，code 只能用一次。
+- [x] API 同时接受 Cookie session 和 `Authorization: Bearer <设备 token>`。
+- [x] 网页端设备管理：查看设备并吊销。
+- [x] 用户级 WebSocket 推送：Mac 客户端常驻连接，并上报最近一次键盘鼠标活动时间。
+- [x] 「发送到电脑」默认推给最近活跃的那台 Mac，安卓端可以手动切换目标。没有 Mac 在线时直接返回失败，不排队。
+- [x] 发送的是识别原文，不整理，服务端不留存。
+
+实现时定下的细节（效果见 design/pc.html 的 `#user-menu`、`#devices`、`#devices-revoke`、`#devices-empty`，以及 design/device-auth.html）：
+
+- 登录流程参照 RFC 8252：客户端带上 `platform`（`mac` 或 `android`）、`name`、`redirect_uri`、`state`、`code_challenge`（只接受 `code_challenge_method=S256`）打开 `/auth/device/login`。这些参数跟着登录 Cookie 走一遍 OIDC，回调仍是 `/auth/callback`，Authelia 不用另外登记。回调后跳到 `/auth/device/confirm` 授权确认页，显示设备和当前账号；点「允许」才发 code，点「取消」带 `error=access_denied` 回到客户端。两种结果都带回客户端的 `state`。浏览器本身不会因此登录网页。
+- `redirect_uri` 白名单：Mac 只能是 `http://127.0.0.1:<任意端口>/callback`，安卓只能是 `tingxie://auth/callback`。
+- 确认页由 Go 直接渲染（internal/auth/device.go），不依赖前端应用，跟随系统亮暗色。待确认的请求放在内存里，10 分钟有效，用 `asr_device` Cookie（`/auth/device/`，Lax）对上，提交时检查同源，并核对表单里的 id 和 Cookie 是否一致。允许后，页面用脚本跳回客户端，同时留一个「点这里」链接，以防浏览器拦截不是用户手势触发的跳转。
+- code 放在内存里，60 秒有效，只能用一次（换失败也作废）。客户端 `POST /auth/device/token {"code","code_verifier"}`，拿到 `{"token","device"}`。token 是 `asr_d_` 加 32 字节随机数，库里只存 SHA-256，不过期。每次登录都新建一个设备；客户端退出登录时 `DELETE /api/devices/<自己的 id>`。
+- Bearer 请求不做同源检查；`dev_user` 模式下也认 Bearer，没有 Bearer 的请求才按 dev 用户处理。`dev_user` 模式的设备登录跳过 OIDC，直接到确认页。设备的最近使用时间最多 5 分钟写一次。
+- 设备可以列出设备，只能吊销自己；吊销别的设备只能在网页上（Cookie 会话）操作。吊销后，那台设备的推送连接立刻断开（关闭码 1008，原因 `device revoked`）。
+- 设备管理：用户菜单里依次是「设备」「退出登录」。对话框列出平台图标、设备名，以及「在线」（Mac 有推送连接时显示，薄荷色加深的圆点）或「x 分钟前使用」、平台、登录日期；在线的排在前面，其余按最近使用时间排。悬停才出现「吊销」，点一次变成红色的「确认吊销」，3 秒内再点才吊销。对话框打开时每 10 秒刷新一次。
+- 推送：`GET /api/devices/stream`（WebSocket），只接受 Mac 的设备 token。服务端每 20 秒 ping 一次，10 秒内没有 pong 就断开；同一台设备的新连接会顶掉旧连接。Mac 有键盘鼠标操作时发 `{"type":"activity"}`，最多每 5 秒一次，时间以服务端收到为准。连接和活动时间只放在内存里。
+- `POST /api/send {"text","device_id"?}`：不指定 `device_id` 时，选在线 Mac 里最近有活动的一台（都没有活动时，选最后连上的）。服务端推 `{"type":"insert","id","text"}`，等 Mac 回 `{"type":"ack","id","error"?}`，最多 5 秒。成功时返回 `{"device":{"id","name"}}`；没有在线的 Mac 返回 409「没有在线的电脑」，指定的 Mac 不在线返回 409「这台电脑不在线」，超时返回 504「电脑没有响应」，Mac 报错时返回 502 和它给的原因，连接中途断开返回 502。文字最多 20000 字，不写库，也不记日志。网页的 Cookie 会话也能调用，但网页界面不提供这个功能。
+- `GET /api/devices` 返回每台设备的 `online` 和 `last_active_at`（毫秒），安卓用它显示和切换目标。
+- 没有原生客户端时的测试：Go 测试用 coder/websocket 模拟 Mac（internal/server/devices_test.go）；Authelia 契约测试走一遍完整的设备登录。手动演示用 .tmp/devtool（不进仓库）。
+- 留给阶段 9、10：安卓上用 Custom Tab 打开登录页时，要真机确认脚本跳回 `tingxie://` 能触发；Mac 的 loopback 回调页面由客户端自己返回。
 
 ## 阶段 9：安卓客户端（Compose）
 

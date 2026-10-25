@@ -24,6 +24,18 @@ export type Doc = DocSummary & { content: string; tidy_ranges?: Span[] };
 
 export type DocPatch = Partial<Pick<Doc, "title" | "color" | "content" | "tidy_ranges">>;
 
+/** A native client signed in as the user. Times are Unix milliseconds. */
+export type Device = {
+  id: number;
+  name: string;
+  platform: "mac" | "android";
+  created_at: number;
+  last_used_at: number;
+  /** A Mac with its push connection open. */
+  online: boolean;
+  last_active_at?: number;
+};
+
 export class ApiError extends Error {
   readonly status: number;
   constructor(status: number, message: string) {
@@ -70,6 +82,8 @@ export const api = {
     request<DocSummary>("PATCH", `/api/documents/${id}`, patch, keepalive),
   deleteDocument: (id: number) => request<null>("DELETE", `/api/documents/${id}`),
   restoreDocument: (id: number) => request<null>("POST", `/api/documents/${id}/restore`),
+  devices: () => request<Device[]>("GET", "/api/devices"),
+  revokeDevice: (id: number) => request<null>("DELETE", `/api/devices/${id}`),
 };
 
 export type TidyRequest = { text: string; headings: string[]; prefix: string; suffix: string };

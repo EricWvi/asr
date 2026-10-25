@@ -12,6 +12,7 @@ import (
 
 	"asr/internal/auth"
 	"asr/internal/dashscope"
+	"asr/internal/push"
 	"asr/internal/store"
 	"asr/internal/tidy"
 )
@@ -23,18 +24,24 @@ type Options struct {
 	ASR *dashscope.Client
 	// Tidy rewrites transcripts; nil when it is not configured.
 	Tidy *tidy.Client
+	// Hub delivers text to Macs; nil makes one with production timings.
+	Hub *push.Hub
 }
 
 type server struct {
 	store *store.Store
 	opts  Options
+	hub   *push.Hub
 }
 
 // New returns the HTTP handler for auth, the API and the frontend in web.
 // The API requires a signed-in user; the app shell does not, so it can load
 // offline and send the user to the login page.
 func New(st *store.Store, authn *auth.Service, web fs.FS, opts Options) (http.Handler, error) {
-	s := &server{store: st, opts: opts}
+	s := &server{store: st, opts: opts, hub: opts.Hub}
+	if s.hub == nil {
+		s.hub = push.NewHub()
+	}
 	static, err := newStatic(web)
 	if err != nil {
 		return nil, err
@@ -44,7 +51,8 @@ func New(st *store.Store, authn *auth.Service, web fs.FS, opts Options) (http.Ha
 	mux.HandleFunc("GET /api/version", s.getVersion)
 	authn.Register(mux)
 
-	// Everything registered on private is only reachable with a session.
+	// Everything registered on private is only reachable with a session or
+	// a device token.
 	private := http.NewServeMux()
 	mux.Handle("/api/", authn.Require(private))
 	mux.Handle("/", static)
@@ -61,6 +69,10 @@ func New(st *store.Store, authn *auth.Service, web fs.FS, opts Options) (http.Ha
 	private.HandleFunc("GET /api/images/{id}", s.getImage)
 	private.HandleFunc("GET /api/asr", s.recognize)
 	private.HandleFunc("POST /api/tidy", s.tidy)
+	private.HandleFunc("GET /api/devices", s.listDevices)
+	private.HandleFunc("DELETE /api/devices/{id}", s.revokeDevice)
+	private.HandleFunc("GET /api/devices/stream", s.streamDevice)
+	private.HandleFunc("POST /api/send", s.send)
 	private.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "接口不存在")
 	})

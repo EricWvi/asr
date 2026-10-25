@@ -64,7 +64,7 @@ task build           # 产物：release/asr
 | `ASR_DASHSCOPE_API_KEY` | `dashscope.api_key` |
 | `ASR_TIDY_API_KEY` | `tidy.api_key` |
 
-在 Authelia 中注册一个 confidential client：回调地址 `<public_url>/auth/callback`，scope 为 `openid profile email`，授权方式 `authorization_code`，要求 PKCE（S256），认证方式 `client_secret_basic`。
+在 Authelia 中注册一个 confidential client：回调地址 `<public_url>/auth/callback`，scope 为 `openid profile email`，授权方式 `authorization_code`，要求 PKCE（S256），认证方式 `client_secret_basic`。安卓和 Mac 客户端的登录也走这个 client 和回调地址，不用另外注册。
 
 ## 发布
 

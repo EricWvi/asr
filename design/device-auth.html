@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>听写 · 设备登录（原型）</title>
+<style>
+/*
+ * 原生客户端登录时，统一认证回调之后的授权确认页，由服务端直接渲染，不依赖前端应用。
+ * token 和 pc.html 一致；手机和电脑浏览器都会打开它，窄屏下卡片占满宽度。
+ */
+:root {
+  color-scheme: light;
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --ink: #1d1d1f;
+  --ink-2: #6e6e73;
+  --ink-3: #a1a1a6;
+  --line: #ebe8e3;
+  --hover: rgb(0 0 0 / 0.035);
+  --selected: rgb(0 0 0 / 0.06);
+  --chip: #f2f1ef;
+  --accent: #1a7cf5;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05), 0 2px 8px -2px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px -10px rgb(0 0 0 / 0.14);
+  --periwinkle: #b6c4f4;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1b1d;
+  --surface: #2a2a2d;
+  --ink: #f2f2f4;
+  --ink-2: #a0a0a7;
+  --ink-3: #6c6c72;
+  --line: #3a3a3e;
+  --hover: rgb(255 255 255 / 0.04);
+  --selected: rgb(255 255 255 / 0.08);
+  --chip: #36363a;
+  --accent: #3b8ef7;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -10px rgb(0 0 0 / 0.5);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: grid; place-items: center; padding: 24px;
+  background: var(--bg); color: var(--ink);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus:not(:focus-visible) { outline: none; }
+a { color: inherit; }
+svg { display: block; }
+.icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+.card {
+  width: 100%; max-width: 380px; padding: 28px 28px 24px; border-radius: 20px;
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-md);
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 9px;
+  display: grid; place-items: center;
+  background: var(--surface); box-shadow: var(--shadow-sm); color: var(--accent);
+}
+:root[data-theme="dark"] .brand-mark { background: var(--chip); }
+.brand-name { font: 600 16px/1 "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif; letter-spacing: .06em; }
+h1 { margin: 0 0 16px; font-size: 18px; font-weight: 600; line-height: 1.4; }
+
+.rows { border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); }
+.item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.item + .item { border-top: 1px solid var(--line); }
+.item-icon {
+  width: 32px; height: 32px; border-radius: 9px; flex: none;
+  display: grid; place-items: center; background: var(--chip); color: var(--ink-2);
+}
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: 13px; font-weight: 600;
+  background: var(--periwinkle); color: #1d1d1f;
+}
+.item-body { min-width: 0; }
+.item-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-sub { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.actions { display: flex; gap: 10px; margin-top: 22px; }
+.btn {
+  flex: 1; height: 40px; border-radius: var(--radius, 10px);
+  font-size: 14px; font-weight: 500;
+  transition: background .15s, transform .12s;
+}
+.btn:active { transform: scale(.98); }
+.btn.secondary { background: var(--chip); }
+.btn.secondary:hover { background: color-mix(in oklch, var(--chip), var(--ink) 6%); }
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.primary:hover { background: color-mix(in oklch, var(--accent), #000 8%); }
+
+/* 结果：允许后跳回客户端，留一个手动返回的链接；取消和过期只有一句话 */
+.result { text-align: center; padding: 8px 0 4px; }
+.result .mark {
+  width: 44px; height: 44px; margin: 0 auto 14px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--chip); color: var(--ink-2);
+}
+.result .mark .icon { width: 20px; height: 20px; }
+.result .mark.ok { background: color-mix(in oklch, var(--accent) 14%, var(--surface)); color: var(--accent); }
+.result h1 { margin-bottom: 6px; }
+.result p { margin: 0; font-size: 13px; color: var(--ink-2); }
+.result p a { color: var(--accent); text-decoration: none; }
+.result p a:hover { text-decoration: underline; }
+[hidden] { display: none !important; }
+
+/* ---------- 原型专用：右下角的状态菜单（不是界面的一部分） ---------- */
+.states-btn {
+  position: fixed; right: 16px; bottom: 16px; z-index: 30;
+  height: 32px; padding: 0 12px; border-radius: 999px;
+  display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2);
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-md);
+}
+.states-btn:hover { color: var(--ink); }
+.states {
+  position: fixed; right: 16px; bottom: 56px; z-index: 30; width: 240px;
+  padding: 6px; border-radius: 12px; background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow-md);
+}
+.states h4 { margin: 8px 10px 4px; font-size: 11.5px; font-weight: 500; color: var(--ink-3); }
+.states button {
+  width: 100%; height: 30px; padding: 0 10px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: space-between; font-size: 13px; text-align: left;
+}
+.states button:hover { background: var(--hover); }
+.states button[aria-current="true"] { background: var(--selected); }
+.states code { font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-3); }
+.states .switch { width: 28px; height: 16px; border-radius: 999px; background: var(--chip); position: relative; }
+.states .switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-sm); transition: left .15s; }
+.states .toggle[aria-pressed="true"] .switch { background: var(--accent); }
+.states .toggle[aria-pressed="true"] .switch::after { left: 14px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+</svg>
+
+<main class="card">
+  <div class="brand"><div class="brand-mark"><svg class="icon"><use href="#i-mic"/></svg></div><div class="brand-name">听写</div></div>
+
+  <section id="ask">
+    <h1>允许这台设备登录？</h1>
+    <div class="rows">
+      <div class="item">
+        <span class="item-icon"><svg class="icon"><use href="#i-laptop" id="platformIcon"/></svg></span>
+        <span class="item-body"><div class="item-name" id="deviceName">Eric 的 MacBook Pro</div><div class="item-sub" id="platformName">Mac 客户端</div></span>
+      </div>
+      <div class="item">
+        <span class="avatar">E</span>
+        <span class="item-body"><div class="item-name">Eric</div><div class="item-sub">eric@example.com</div></span>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn secondary" id="deny">取消</button>
+      <button class="btn primary" id="allow">允许</button>
+    </div>
+  </section>
+
+  <section class="result" id="allowed" hidden>
+    <div class="mark ok"><svg class="icon"><use href="#i-check"/></svg></div>
+    <h1>已允许登录</h1>
+    <p>正在返回应用，没有跳转的话<a href="#">点这里</a></p>
+  </section>
+
+  <section class="result" id="denied" hidden>
+    <div class="mark"><svg class="icon"><use href="#i-x"/></svg></div>
+    <h1>已取消登录</h1>
+  </section>
+
+  <section class="result" id="expired" hidden>
+    <div class="mark"><svg class="icon"><use href="#i-clock"/></svg></div>
+    <h1>登录已过期</h1>
+    <p>请回到应用重新登录</p>
+  </section>
+</main>
+
+<script>
+// 原型交互：允许、取消只切换显示。
+// 直接打开某个状态：device-auth.html#android（安卓设备）、#allowed（已允许）、#denied（已取消）、#expired（过期或无效）、#dark，可组合
+const $ = (id) => document.getElementById(id);
+const root = document.documentElement;
+const show = (id) => ['ask', 'allowed', 'denied', 'expired'].forEach((s) => { $(s).hidden = s !== id; });
+$('allow').onclick = () => show('allowed');
+$('deny').onclick = () => show('denied');
+
+if (matchMedia('(prefers-color-scheme: dark)').matches) root.dataset.theme = 'dark';
+const hash = location.hash;
+if (hash.includes('dark')) root.dataset.theme = 'dark';
+if (hash.includes('android')) {
+  $('platformIcon').setAttribute('href', '#i-phone');
+  $('deviceName').textContent = 'Pixel 9';
+  $('platformName').textContent = '安卓客户端';
+}
+const st = ['allowed', 'denied', 'expired'].find((s) => hash.includes(s));
+if (st) show(st);
+
+// 原型专用：右下角的状态菜单，同 pc.html。自动化截图时不显示。
+{
+  const groups = [['设备登录', [['Mac 确认', ''], ['安卓确认', 'android'], ['已允许', 'allowed'], ['已取消', 'denied'], ['已过期', 'expired']]]];
+  const dark = location.hash.slice(1).startsWith('dark');
+  const state = location.hash.slice(1).replace(/^dark-?/, '');
+  const go = (s, d) => { location.hash = [d ? 'dark' : '', s].filter(Boolean).join('-') || '_'; location.reload(); };
+  const btn = document.createElement('button');
+  btn.className = 'states-btn'; btn.innerHTML = '<svg class="icon"><use href="#i-more"/></svg>状态';
+  const menu = document.createElement('div');
+  menu.className = 'states'; menu.hidden = true;
+  const t = document.createElement('button');
+  t.className = 'toggle'; t.setAttribute('aria-pressed', dark); t.innerHTML = '暗色<span class="switch"></span>';
+  t.onclick = () => go(state, !dark);
+  menu.append(t);
+  for (const [name, items] of groups) {
+    const h = document.createElement('h4'); h.textContent = name; menu.append(h);
+    for (const [label, s] of items) {
+      const b = document.createElement('button');
+      b.innerHTML = `${label}<code>${s ? '#' + s : ''}</code>`;
+      if (s === state) b.setAttribute('aria-current', 'true');
+      b.onclick = () => go(s, dark);
+      menu.append(b);
+    }
+  }
+  btn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; };
+  menu.onclick = (e) => e.stopPropagation();
+  document.addEventListener('click', () => { menu.hidden = true; });
+  if (!navigator.webdriver) document.body.append(btn, menu);
+}
+</script>
+</body>
+</html>

@@ -54,6 +54,8 @@ type Service struct {
 	origin   string // empty in dev mode
 	secure   bool
 
+	flows *deviceFlows
+
 	devUser     string
 	devOnce     sync.Once
 	devErr      error
@@ -62,7 +64,11 @@ type Service struct {
 
 // New returns the auth service. It does not contact the identity provider.
 func New(st *store.Store, cfg Config) *Service {
-	s := &Service{store: st, devUser: cfg.DevUser}
+	s := &Service{
+		store:   st,
+		devUser: cfg.DevUser,
+		flows:   &deviceFlows{approvals: map[string]approval{}, codes: map[string]issued{}},
+	}
 	if cfg.DevUser != "" {
 		return s
 	}
@@ -88,19 +94,45 @@ func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /auth/login", s.login)
 	mux.HandleFunc("GET /auth/callback", s.callback)
 	mux.HandleFunc("POST /auth/logout", s.logout)
+	mux.HandleFunc("GET /auth/device/login", s.deviceLogin)
+	mux.HandleFunc("GET /auth/device/confirm", s.deviceConfirm)
+	mux.HandleFunc("POST /auth/device/approve", s.deviceApprove)
+	mux.HandleFunc("POST /auth/device/token", s.deviceToken)
 }
 
 type userKey struct{}
+
+type deviceKey struct{}
 
 // User returns the signed-in user of a request that passed Require.
 func User(ctx context.Context) store.User {
 	return ctx.Value(userKey{}).(store.User)
 }
 
-// Require rejects requests without a valid session with 401 and makes the
-// user available through User.
+// Device returns the native client that made a request that passed
+// Require, or false for a browser session.
+func Device(ctx context.Context) (store.Device, bool) {
+	d, ok := ctx.Value(deviceKey{}).(store.Device)
+	return d, ok
+}
+
+// Require rejects requests without a valid session or device token with
+// 401 and makes the user available through User and the device through
+// Device.
 func (s *Service) Require(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A device token is never sent by the browser on its own, so it
+		// needs no origin check.
+		if h := r.Header.Get("Authorization"); h != "" {
+			user, device, ok := s.bearer(r, h)
+			if !ok {
+				writeError(w, http.StatusUnauthorized, "未登录")
+				return
+			}
+			ctx := context.WithValue(r.Context(), userKey{}, user)
+			next.ServeHTTP(w, r.WithContext(context.WithValue(ctx, deviceKey{}, device)))
+			return
+		}
 		if !s.sameOrigin(r) {
 			writeError(w, http.StatusForbidden, "请求来源不受信任")
 			return
@@ -150,11 +182,13 @@ func (s *Service) authenticate(w http.ResponseWriter, r *http.Request) (store.Us
 
 // loginFlow is kept in a short-lived cookie between /auth/login and
 // /auth/callback. State ties the callback to this browser; the nonce and
-// PKCE verifier tie the tokens to this login attempt.
+// PKCE verifier tie the tokens to this login attempt. Device is set when
+// a native client started the login.
 type loginFlow struct {
-	State    string `json:"s"`
-	Nonce    string `json:"n"`
-	Verifier string `json:"v"`
+	State    string         `json:"s"`
+	Nonce    string         `json:"n"`
+	Verifier string         `json:"v"`
+	Device   *deviceRequest `json:"d,omitempty"`
 }
 
 func (s *Service) login(w http.ResponseWriter, r *http.Request) {
@@ -162,13 +196,18 @@ func (s *Service) login(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
+	s.startLogin(w, r, nil)
+}
+
+// startLogin sends the browser to the identity provider.
+func (s *Service) startLogin(w http.ResponseWriter, r *http.Request, device *deviceRequest) {
 	p, err := s.provider.get(r.Context())
 	if err != nil {
 		slog.Error("oidc discovery", "err", err)
-		s.page(w, http.StatusServiceUnavailable, "认证服务暂时不可用，请稍后重试。")
+		s.fail(w, device != nil, http.StatusServiceUnavailable, "认证服务暂时不可用，请稍后重试。")
 		return
 	}
-	flow := loginFlow{State: random(), Nonce: random(), Verifier: oauth2.GenerateVerifier()}
+	flow := loginFlow{State: random(), Nonce: random(), Verifier: oauth2.GenerateVerifier(), Device: device}
 	raw, _ := json.Marshal(flow)
 	http.SetCookie(w, &http.Cookie{
 		Name:     loginCookie,
@@ -197,21 +236,28 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		s.page(w, http.StatusBadRequest, "登录已过期或无效，请重新登录。")
 		return
 	}
+	device := flow.Device != nil
 	if e := q.Get("error"); e != "" {
 		slog.Warn("oidc authorization denied", "error", e, "description", q.Get("error_description"))
-		s.page(w, http.StatusForbidden, "登录未完成。")
+		s.fail(w, device, http.StatusForbidden, "登录未完成。")
 		return
 	}
 	id, err := s.provider.identify(r.Context(), q.Get("code"), flow)
 	if err != nil {
 		slog.Error("oidc callback", "err", err)
-		s.page(w, http.StatusBadGateway, "无法完成登录，请重试。")
+		s.fail(w, device, http.StatusBadGateway, "无法完成登录，请重试。")
 		return
 	}
 	user, err := s.store.UpsertUser(r.Context(), id)
 	if err != nil {
 		slog.Error("save user", "err", err)
-		s.page(w, http.StatusInternalServerError, "无法完成登录，请重试。")
+		s.fail(w, device, http.StatusInternalServerError, "无法完成登录，请重试。")
+		return
+	}
+	// A native client gets its token after the user allows it; the
+	// browser itself stays signed out.
+	if device {
+		s.startApproval(w, r, user, *flow.Device)
 		return
 	}
 	token, err := s.store.CreateSession(r.Context(), user.ID)
@@ -291,6 +337,16 @@ var pageTmpl = template.Must(template.New("page").Parse(`<!doctype html>
 <style>body{font:15px system-ui,sans-serif;background:#faf8f5;color:#1d1d1f;display:grid;place-items:center;min-height:100vh;margin:0}
 @media (prefers-color-scheme:dark){body{background:#1b1b1d;color:#f2f2f4}}a{color:inherit}</style>
 <p>{{.}} <a href="/auth/login">重新登录</a></p></html>`))
+
+// fail shows msg on the device page during a native client's login, so
+// it does not offer the web login.
+func (s *Service) fail(w http.ResponseWriter, device bool, status int, msg string) {
+	if device {
+		s.devicePage(w, status, devicePageData{Kind: "error", Title: "无法登录", Message: strings.TrimSuffix(msg, "。")})
+		return
+	}
+	s.page(w, status, msg)
+}
 
 func (s *Service) page(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

@@ -93,6 +93,21 @@ var migrations = []migration{
 	END;
 	INSERT INTO documents_fts (documents_fts) VALUES ('rebuild');
 	`),
+	execSQL(`
+	-- Native clients signed in through /auth/device/login. Like sessions,
+	-- a device token never expires; the row lives until it is revoked.
+	-- Times are Unix milliseconds.
+	CREATE TABLE devices (
+		id           INTEGER PRIMARY KEY,
+		user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		name         TEXT    NOT NULL,
+		platform     TEXT    NOT NULL,
+		token_hash   TEXT    NOT NULL UNIQUE,
+		created_at   INTEGER NOT NULL,
+		last_used_at INTEGER NOT NULL
+	);
+	CREATE INDEX devices_user ON devices (user_id);
+	`),
 }
 
 func migrate(db *sql.DB) error {
