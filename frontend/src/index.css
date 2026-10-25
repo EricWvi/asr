@@ -267,9 +267,31 @@
   color: var(--ink-3) !important;
   font-weight: 400 !important;
 }
+/* Drawn rather than typed, so the size does not depend on the font's • ◦ ▪. */
 .cm-md-bullet {
-  left: calc(var(--depth) * 1.4em + 0.3em);
+  top: 0;
+  left: calc(var(--depth) * 1.4em);
+  width: 1em;
+  height: 1.85em;
+  display: grid;
+  place-items: center;
   color: var(--ink-3);
+}
+.cm-md-bullet::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.cm-md-bullet[data-shape="circle"]::before {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.cm-md-bullet[data-shape="square"]::before {
+  width: 5.5px;
+  height: 5.5px;
+  border-radius: 1px;
 }
 .cm-md-box {
   position: absolute;

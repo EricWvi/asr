@@ -3,7 +3,8 @@ import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
 
 /*
  * Search hits in a document opened from the search results: every
- * occurrence of the query's words is tinted until the text is edited.
+ * occurrence of the query's words is tinted until the text is edited or
+ * the search is cleared.
  */
 
 const MAX_HITS = 1000;
@@ -52,4 +53,8 @@ export function showSearchHits(view: EditorView, words: string[]): boolean {
     effects: [setHits.of(Decoration.set(ranges)), EditorView.scrollIntoView(first.from, { y: "center" })],
   });
   return true;
+}
+
+export function clearHits(view: EditorView) {
+  if (view.state.field(hits).size) view.dispatch({ effects: setHits.of(Decoration.none) });
 }

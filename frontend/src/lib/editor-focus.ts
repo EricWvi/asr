@@ -1,6 +1,6 @@
 import type { EditorView } from "@codemirror/view";
 
-import { showSearchHits } from "@/editor/search-hits";
+import { clearHits, showSearchHits } from "@/editor/search-hits";
 
 /*
  * The open document's editor, so that actions outside it (opening or
@@ -47,6 +47,11 @@ export function focusEditor(where: Where = "end", doc: number | null = null) {
     wanted = null;
     apply(view, where);
   } else wanted = { where, doc };
+}
+
+/** Untints the open document's search hits. */
+export function clearSearchHits() {
+  if (view) clearHits(view);
 }
 
 /** The open document's editor, if it has mounted. */

@@ -83,10 +83,7 @@ function Groups({ onCount }: { onCount: (n: number) => void }) {
   );
 }
 
-const SEARCH_DELAY_MS = 150;
-
-function SearchResults({ query, onCount }: { query: string; onCount: (n: number) => void }) {
-  const q = useDebounced(query, SEARCH_DELAY_MS);
+function SearchResults({ query: q, onCount }: { query: string; onCount: (n: number) => void }) {
   const filter = useWorkspace((s) => s.filter);
   const { data, error, isPlaceholderData } = useQuery({
     queryKey: ["search", q],
@@ -108,15 +105,6 @@ function SearchResults({ query, onCount }: { query: string; onCount: (n: number)
       ))}
     </section>
   );
-}
-
-function useDebounced<T>(value: T, ms: number) {
-  const [settled, setSettled] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setSettled(value), ms);
-    return () => clearTimeout(t);
-  }, [value, ms]);
-  return settled;
 }
 
 /** Text with the search words tinted in the document's mark colour; hit styles the tinted words. */

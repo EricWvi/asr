@@ -106,14 +106,14 @@ svg { display: block; }
 
 /* ---------- 侧栏 ---------- */
 .sidebar { display: flex; flex-direction: column; min-height: 0; padding: 8px 12px 0 16px; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px 18px; }
+.brand { display: flex; align-items: center; gap: 14px; padding: 2px 6px 18px; }
 .brand-mark {
-  width: 30px; height: 30px; border-radius: 9px;
+  width: 34px; height: 34px; border-radius: 10px;
   display: grid; place-items: center;
   background: var(--surface); box-shadow: var(--shadow-sm);
   color: var(--accent);
 }
-.brand-name { font: 600 16px/1 "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif; letter-spacing: .06em; }
+.brand-name { font: 700 18px/1 "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif; letter-spacing: .06em; }
 .brand-spacer { flex: 1; }
 .icon-btn {
   width: 30px; height: 30px; border-radius: 9px;
@@ -125,7 +125,7 @@ svg { display: block; }
 .row {
   width: 100%; height: 36px; padding: 0 10px; border-radius: var(--radius-item);
   display: flex; align-items: center; gap: 10px; text-align: left;
-  font-size: 14px; transition: background .12s;
+  font-size: 14px; font-weight: 500; transition: background .12s;
 }
 .row:hover { background: var(--hover); }
 .row .icon { color: var(--ink-2); }
@@ -140,7 +140,7 @@ svg { display: block; }
 .search:hover { background: var(--hover); }
 .search .icon { flex: none; color: var(--ink-2); }
 .search:focus-within, .search.filled { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-sm); }
-.search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: none; font: inherit; color: var(--ink); }
+.search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: none; font: inherit; font-weight: 500; color: var(--ink); }
 .search input::placeholder { color: var(--ink); opacity: 1; }
 .search:focus-within input::placeholder { color: var(--ink-3); }
 .search-kbd { margin-right: 4px; }
@@ -362,8 +362,12 @@ svg { display: block; }
 .cm .lm { position: absolute; left: 0.15em; }
 .cm .l2 .lm { left: 1.55em; }
 .cm .rd.lm { color: var(--ink-3); }
-.cm .li .rd.lm { left: 0.3em; }
-.cm .l2 .rd.lm { left: 1.7em; }
+/* 列表符号画出来，大小不随字体的 • ◦ 变 */
+.cm .li .rd.lm { left: 0; top: 0; width: 1em; height: 1.85em; display: grid; place-items: center; }
+.cm .l2 .rd.lm { left: 1.4em; }
+.cm .li .rd.lm::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.cm .l2 .rd.lm::before { background: none; box-shadow: inset 0 0 0 1.5px currentColor; }
+.cm .ln.cur .rd.lm { display: none; }
 .cm .oli .lm { left: 0; }
 /* 待办：复选框可点，完成项变淡加删除线 */
 .cm .ln.task { padding-left: 27px; }
@@ -595,7 +599,7 @@ kbd {
 <body>
 <svg width="0" height="0" style="position:absolute">
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
-  <symbol id="i-new" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></symbol>
+  <symbol id="i-new" viewBox="0 0 24 24"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
   <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></symbol>
   <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z"/></symbol>
@@ -620,7 +624,7 @@ kbd {
   <aside class="sidebar">
     <div class="brand">
       <div class="brand-mark"><svg class="icon"><use href="#i-mic"/></svg></div>
-      <div class="brand-name">听写</div>
+      <div class="brand-name">听·写</div>
       <div class="brand-spacer"></div>
       <button class="icon-btn" title="收起侧栏"><svg class="icon"><use href="#i-sidebar"/></svg></button>
     </div>
@@ -631,7 +635,7 @@ kbd {
       <svg class="icon"><use href="#i-search"/></svg>
       <input id="q" placeholder="搜索" autocomplete="off" spellcheck="false">
       <button class="search-clear" id="qClear" title="清除" hidden><svg class="icon"><use href="#i-x"/></svg></button>
-      <kbd class="search-kbd">⌘K</kbd>
+      <kbd class="search-kbd">⌘ K</kbd>
     </label>
 
     <div class="section"><span>文稿</span><div class="filters" id="filters"><button class="fdot tinted" data-c="butter" style="--tint: var(--butter)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="peach" style="--tint: var(--peach)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="rose" style="--tint: var(--rose)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="periwinkle" style="--tint: var(--periwinkle)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="sky" style="--tint: var(--sky)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="mint" style="--tint: var(--mint)" aria-pressed="false" title="只看这种颜色"><span></span></button></div></div>
@@ -713,11 +717,11 @@ kbd {
           <div class="ln blank"></div>
           <div class="ln" data-at="mark">先去杭州看看西溪湿地，听说<em><span class="mk">*</span>十月底<span class="mk">*</span></em>芦苇正好。<mark><span class="mk">==</span>路线上想顺便去一趟<a href="#" class="lk"><span class="mk">[</span>良渚博物院<span class="mk">](</span><span class="mk url">https://www.lzmuseum.cn</span><span class="mk">)</span></a><span class="mk">==</span></mark>，上次去的时候闭馆了，<s><span class="mk">~~</span>这次碰碰运气<span class="mk">~~</span></s>这次提前在小程序上约好。</div>
           <div class="ln blank"></div>
-          <div class="ln li" data-at="li"><span class="mk lm">-</span><span class="rd lm">•</span>周六早上 8 点出发，避开高速拥堵</div>
-          <div class="ln li"><span class="mk lm">-</span><span class="rd lm">•</span>中午在西溪附近找家本帮菜，<strong><span class="mk">**</span>不要网红店<span class="mk">**</span></strong></div>
-          <div class="ln li l2"><span class="mk lm">-</span><span class="rd lm">◦</span>楼外楼排队太久，备选知味观</div>
-          <div class="ln li"><span class="mk lm">-</span><span class="rd lm">•</span>晚上住在湖滨，第二天早起绕湖骑一圈</div>
-          <div class="ln li"><span class="mk lm">-</span><span class="rd lm">•</span><span class="pending" data-tidied="第二天中午前退房，之后去河坊街逛逛">第二天中午之前要退房，那个退房之后呢再去河坊街逛一下</span></div>
+          <div class="ln li" data-at="li"><span class="mk lm">-</span><span class="rd lm"></span>周六早上 8 点出发，避开高速拥堵</div>
+          <div class="ln li"><span class="mk lm">-</span><span class="rd lm"></span>中午在西溪附近找家本帮菜，<strong><span class="mk">**</span>不要网红店<span class="mk">**</span></strong></div>
+          <div class="ln li l2"><span class="mk lm">-</span><span class="rd lm"></span>楼外楼排队太久，备选知味观</div>
+          <div class="ln li"><span class="mk lm">-</span><span class="rd lm"></span>晚上住在湖滨，第二天早起绕湖骑一圈</div>
+          <div class="ln li"><span class="mk lm">-</span><span class="rd lm"></span><span class="pending" data-tidied="第二天中午前退房，之后去河坊街逛逛">第二天中午之前要退房，那个退房之后呢再去河坊街逛一下</span></div>
           <div class="ln blank"></div>
           <div class="ln h3"><span class="mk hang">###</span>要带的东西</div>
           <div class="ln blank"></div>
@@ -1086,9 +1090,18 @@ const openHits = (words) => {
   cm.querySelector('.hit')?.scrollIntoView({ block: 'center' });
 };
 const clearHits = () => cm.querySelectorAll('.hit').forEach((h) => h.replaceWith(h.textContent));
-q.oninput = search;
-q.onkeydown = (e) => { if (e.key === 'Escape') { q.value = ''; search(); q.blur(); } };
-$('qClear').onclick = (e) => { e.preventDefault(); q.value = ''; search(); q.focus(); };
+// 回车才搜索；清空（删光、×、Esc）立即回到列表，并去掉正文里的命中
+const clearSearch = () => { q.value = ''; search(); clearHits(); };
+q.oninput = () => {
+  $('search').classList.toggle('filled', !!q.value);
+  $('qClear').hidden = !q.value;
+  if (!q.value.trim()) clearSearch();
+};
+q.onkeydown = (e) => {
+  if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) search();
+  if (e.key === 'Escape') { clearSearch(); q.blur(); }
+};
+$('qClear').onclick = (e) => { e.preventDefault(); clearSearch(); q.focus(); };
 document.addEventListener('keydown', (e) => { if (e.key === 'k' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); q.focus(); q.select(); } });
 cm.addEventListener('keydown', clearHits);
 

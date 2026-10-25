@@ -35,7 +35,7 @@ class BulletWidget extends WidgetType {
   toDOM() {
     const el = document.createElement("span");
     el.className = "cm-md-lm cm-md-bullet";
-    el.textContent = ["•", "◦", "▪"][this.depth % 3]!;
+    el.dataset.shape = ["disc", "circle", "square"][this.depth % 3]!;
     return el;
   }
 }

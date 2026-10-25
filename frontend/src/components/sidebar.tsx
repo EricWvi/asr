@@ -1,4 +1,4 @@
-import { FilePlusIcon } from "lucide-react";
+import { SquarePenIcon } from "lucide-react";
 
 import logo from "@/assets/logo.svg";
 import { DocList } from "@/components/doc-list";
@@ -13,19 +13,19 @@ export function Sidebar({ user }: { user: User }) {
 
   return (
     <aside className="flex min-h-0 flex-col pt-2 pr-3 pl-4 max-md:hidden max-md:px-3 max-md:pt-[max(12px,env(safe-area-inset-top))] max-md:pb-[env(safe-area-inset-bottom)] max-md:list-open:flex">
-      <div className="flex items-center gap-2.5 px-1.5 pt-0.5 pb-[18px]">
-        <div className="grid size-[30px] place-items-center rounded-[9px] bg-surface shadow-sm">
-          <img src={logo} alt="" className="w-[21px]" />
+      <div className="flex items-center gap-3.5 px-1.5 pt-0.5 pb-[18px]">
+        <div className="grid size-[34px] place-items-center rounded-[10px] bg-surface shadow-sm">
+          <img src={logo} alt="" className="w-6" />
         </div>
-        <div className="font-serif text-base leading-none font-semibold tracking-[.06em]">听写</div>
+        <div className="font-serif text-lg leading-none font-bold tracking-[.06em]">听·写</div>
       </div>
 
       <button
-        className="flex h-9 w-full items-center gap-2.5 rounded-item px-2.5 text-left transition-colors hover:bg-hover"
+        className="flex h-9 w-full items-center gap-2.5 rounded-item px-2.5 text-left font-medium transition-colors hover:bg-hover"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => void newDocument()}
       >
-        <FilePlusIcon className="size-4 text-ink-2" strokeWidth={1.75} />
+        <SquarePenIcon className="size-4 text-ink-2" strokeWidth={1.75} />
         新建文稿
       </button>
       <SearchBox />
