@@ -21,6 +21,8 @@ type WorkspaceState = {
   mode: InputMode;
   /** The sidebar entry being renamed inline. */
   renamingId: number | null;
+  /** On a phone, the list shows instead of the open document. */
+  listOpen: boolean;
 };
 
 function readCurrent() {
@@ -37,6 +39,7 @@ export const useWorkspace = create<WorkspaceState>(() => ({
   filter: null,
   mode: "keyboard",
   renamingId: null,
+  listOpen: false,
 }));
 
 useWorkspace.subscribe((s, prev) => {
@@ -82,6 +85,7 @@ export function openDocument(id: number) {
     if (!isDirty(id)) queryClient.removeQueries({ queryKey: docKey(id) });
     useWorkspace.setState({ currentId: id });
   }
+  useWorkspace.setState({ listOpen: false });
   focusEditor("end", id);
 }
 
@@ -91,6 +95,7 @@ let creating: Promise<void> | null = null;
 export function newDocument() {
   const { currentId, draftId } = useWorkspace.getState();
   if (currentId !== null && currentId === draftId) {
+    useWorkspace.setState({ listOpen: false });
     focusEditor("end");
     return Promise.resolve();
   }
@@ -101,7 +106,7 @@ export function newDocument() {
       queryClient.setQueryData<Doc>(docKey(doc.id), { ...doc, content: "" });
       queryClient.setQueryData<DocSummary[]>(listKey, (l) => [summary, ...(l ?? [])]);
       leaveCurrent();
-      useWorkspace.setState({ currentId: doc.id, draftId: doc.id });
+      useWorkspace.setState({ currentId: doc.id, draftId: doc.id, listOpen: false });
       focusEditor("end", doc.id);
     } catch (err) {
       notifyError(err, "新建文稿失败");

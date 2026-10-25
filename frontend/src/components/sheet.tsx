@@ -1,4 +1,4 @@
-import { KeyboardIcon, MicIcon } from "lucide-react";
+import { ChevronLeftIcon, KeyboardIcon, MicIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Editor } from "@/components/editor";
@@ -21,20 +21,31 @@ export function Sheet({ doc }: { doc: DocSummary }) {
     <div
       className={cn(
         `tint-${doc.color}`,
-        "group/sheet mx-auto flex min-h-0 w-full max-w-[880px] flex-1 flex-col overflow-auto rounded-sheet border border-line bg-paper shadow-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "group/sheet mx-auto flex min-h-0 w-full max-w-[880px] flex-1 flex-col overflow-auto rounded-sheet border border-line bg-paper shadow-md [scrollbar-width:none] max-md:rounded-none max-md:border-0 max-md:shadow-none [&::-webkit-scrollbar]:hidden",
       )}
       data-scrolled={scrolled || undefined}
       onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 60)}
     >
       {/* Sticky bar: solid paper; once scrolled it shows the title, a hairline and a faint shadow. */}
-      <header className="sticky top-0 z-4 flex h-[60px] flex-none items-center gap-0.5 bg-paper pr-4 pl-7 transition-shadow duration-200 group-data-scrolled/sheet:shadow-[0_1px_0_var(--line),0_8px_16px_-10px_rgb(0_0_0/0.12)] dark:group-data-scrolled/sheet:shadow-[0_1px_0_var(--line),0_8px_16px_-10px_rgb(0_0_0/0.6)]">
+      <header className="sticky top-0 z-4 flex h-[60px] flex-none items-center gap-0.5 bg-paper pr-4 pl-7 transition-shadow duration-200 group-data-scrolled/sheet:shadow-[0_1px_0_var(--line),0_8px_16px_-10px_rgb(0_0_0/0.12)] dark:group-data-scrolled/sheet:shadow-[0_1px_0_var(--line),0_8px_16px_-10px_rgb(0_0_0/0.6)] max-md:pl-2">
+        {/* Phones show the list instead of a sidebar. */}
+        <button
+          className="mr-1 inline-flex h-8 flex-none items-center gap-0.5 rounded-[8px] pr-2.5 pl-1 text-[13px] text-ink-2 transition-colors hover:bg-hover hover:text-ink md:hidden"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => useWorkspace.setState({ listOpen: true })}
+        >
+          <ChevronLeftIcon className="size-[18px]" strokeWidth={1.75} />
+          文稿
+        </button>
         <div className="min-w-0 flex-1 translate-y-1 truncate text-[15px] font-semibold opacity-0 transition duration-200 group-data-scrolled/sheet:translate-y-0 group-data-scrolled/sheet:opacity-100">
           {doc.title}
         </div>
-        <ModeSwitch />
+        <div className="max-md:hidden">
+          <ModeSwitch />
+        </div>
       </header>
 
-      <div className="mx-auto w-full max-w-[760px] flex-none px-14 pt-5">
+      <div className="mx-auto w-full max-w-[760px] flex-none px-14 pt-5 max-md:px-10">
         <TitleField key={doc.id} doc={doc} />
         <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
           <ColorPicker doc={doc} />
@@ -46,7 +57,7 @@ export function Sheet({ doc }: { doc: DocSummary }) {
       </div>
 
       <article
-        className="mx-auto w-full max-w-[760px] flex-1 px-14 pt-7 pb-[200px]"
+        className="mx-auto w-full max-w-[760px] flex-1 px-14 pt-7 pb-[200px] max-md:px-10"
         onMouseDown={(e) => {
           // Clicking the blank paper below the text puts the cursor at the end.
           if (e.target !== e.currentTarget) return;

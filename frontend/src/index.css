@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* A phone showing the document list instead of the open document (App.tsx). */
+@custom-variant list-open (:root[data-list-open] &);
+
 /*
  * Tokens follow design/pc.html. Visual reference is Craft: a warm white
  * page, a cream paper sheet, large radii and soft diffuse shadows. Blue is
