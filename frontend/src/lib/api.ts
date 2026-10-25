@@ -59,6 +59,8 @@ export const api = {
   uploadImage: (file: Blob) => request<{ id: string; url: string }>("POST", "/api/images", file),
   me: () => request<User>("GET", "/api/me"),
   documents: () => request<DocSummary[]>("GET", "/api/documents"),
+  /** Documents holding every word; the snippet is the line around the first hit. */
+  search: (q: string) => request<DocSummary[]>("GET", `/api/search?q=${encodeURIComponent(q)}`),
   // The server leaves out empty content.
   document: (id: number) =>
     request<Doc>("GET", `/api/documents/${id}`).then((d) => ({ ...d, content: d.content ?? "" })),

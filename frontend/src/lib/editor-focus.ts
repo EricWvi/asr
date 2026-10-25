@@ -1,20 +1,24 @@
 import type { EditorView } from "@codemirror/view";
 
+import { showSearchHits } from "@/editor/search-hits";
+
 /*
  * The open document's editor, so that actions outside it (opening or
  * creating a document, clicking the blank paper) can put the cursor in it.
  * A request for a document whose editor has not mounted yet waits for it.
  */
 
-/** keep leaves the selection where it was. */
-type Where = "start" | "end" | "keep";
+/** keep leaves the selection where it was; find goes to the first search hit, or the end without one. */
+type Where = "start" | "end" | "keep" | { find: string[] };
 
 let view: EditorView | null = null;
 let viewDoc: number | null = null;
 let wanted: { where: Where; doc: number | null } | null = null;
 
 function apply(v: EditorView, where: Where) {
-  if (where !== "keep") {
+  if (typeof where === "object") {
+    if (!showSearchHits(v, where.find)) v.dispatch({ selection: { anchor: v.state.doc.length } });
+  } else if (where !== "keep") {
     const pos = where === "end" ? v.state.doc.length : 0;
     // Opening a document shows its top; typing scrolls to the cursor.
     v.dispatch({ selection: { anchor: pos } });

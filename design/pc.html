@@ -131,6 +131,30 @@ svg { display: block; }
 .row .icon { color: var(--ink-2); }
 .row .sub { margin-left: auto; }
 
+/* 搜索框：平时和「新建文稿」一样是一行，聚焦或有内容时浮起成输入框 */
+.search {
+  height: 36px; padding: 0 6px 0 10px; border-radius: var(--radius-item);
+  display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: text;
+  transition: background .12s, box-shadow .12s;
+}
+.search:hover { background: var(--hover); }
+.search .icon { flex: none; color: var(--ink-2); }
+.search:focus-within, .search.filled { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-sm); }
+.search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: none; font: inherit; color: var(--ink); }
+.search input::placeholder { color: var(--ink); opacity: 1; }
+.search:focus-within input::placeholder { color: var(--ink-3); }
+.search-kbd { margin-right: 4px; }
+.search:focus-within .search-kbd, .search.filled .search-kbd { display: none; }
+.search-clear { flex: none; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--ink-3); }
+.search-clear:hover { background: var(--hover); color: var(--ink); }
+.search-clear .icon { width: 14px; height: 14px; color: inherit; }
+/* 搜索中：文稿列表换成结果；命中的词用该文稿的 mark 色 */
+.docs .results { display: none; }
+.docs.searching > :not(.results) { display: none; }
+.docs.searching .results { display: block; }
+.doc .hit { background: var(--tint-mark); color: var(--ink); border-radius: 3px; padding: 1px 0; }
+.doc .doc-snip .hit { color: var(--ink-2); }
+
 .section { display: flex; align-items: center; justify-content: space-between; padding: 14px 4px 4px 10px; font-size: 13px; font-weight: 600; }
 /* 按颜色筛选：点一下只看这种颜色的文稿，再点一下取消 */
 .filters { display: flex; }
@@ -392,6 +416,10 @@ svg { display: block; }
 /* 落选变体：文字整体呼吸（#tidying-pulse） */
 .tidying.tidy-pulse .cm .pending { color: var(--ink); background: none; animation: tidy-pulse 1.4s ease-in-out infinite; }
 @keyframes tidy-pulse { 50% { color: var(--ink-3); } }
+/* 从搜索结果打开文稿：正文里的命中用深色的淡底标出，和 ==高亮== 的 mark 色区分；开始编辑或换文稿后消失 */
+.cm .hit { background: color-mix(in oklch, var(--tint-deep) 35%, transparent); border-radius: 3px; padding: 1px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+/* 落选变体：和 ==高亮== 同色（#search-hit-mark） */
+.hit-mark .cm .hit { background: var(--tint-mark); box-shadow: inset 0 -2px 0 var(--tint-deep); }
 /* 说话时的中间结果：淡色显示在插入点，不写进正文；松手拿到全部定稿后一次写入 */
 .cm .interim { color: var(--ink-3); }
 
@@ -468,6 +496,34 @@ kbd {
 .menu .danger:hover { background: color-mix(in oklch, var(--rec) 10%, transparent); }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
 
+/* ---------- 原型专用：右下角的状态菜单，列出全部锚点（不是界面的一部分） ---------- */
+.states-btn {
+  position: fixed; right: 16px; bottom: 16px; z-index: 30;
+  height: 32px; padding: 0 12px; border-radius: 999px;
+  display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2);
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lg);
+}
+.states-btn:hover { color: var(--ink); }
+.states {
+  position: fixed; right: 16px; bottom: 56px; z-index: 30;
+  width: 236px; max-height: calc(100vh - 80px); overflow: auto; padding: 5px; border-radius: 12px;
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lg);
+  scrollbar-width: thin;
+}
+.states h4 { margin: 0; padding: 8px 10px 3px; font-size: 11.5px; font-weight: 500; color: var(--ink-3); }
+.states button {
+  width: 100%; height: 28px; padding: 0 10px; border-radius: 7px;
+  display: flex; align-items: center; gap: 8px; text-align: left; font-size: 13px;
+}
+.states button:hover { background: var(--hover); }
+.states button[aria-current="true"] { background: var(--selected); font-weight: 500; }
+.states button code { margin-left: auto; font: 11px "SF Mono", ui-monospace, Menlo, monospace; color: var(--ink-3); }
+.states .toggle { justify-content: space-between; }
+.states .switch { width: 26px; height: 16px; border-radius: 999px; background: var(--chip); position: relative; transition: background .15s; }
+.states .switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); transition: transform .15s; }
+.states .toggle[aria-pressed="true"] .switch { background: var(--accent); }
+.states .toggle[aria-pressed="true"] .switch::after { transform: translateX(10px); }
+
 /* 侧栏行内重命名：标题位置换成输入框，回车确认、Esc 取消 */
 .doc.renaming { background: var(--selected); }
 .rename {
@@ -510,6 +566,7 @@ kbd {
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol>
 </svg>
 
@@ -523,7 +580,13 @@ kbd {
     </div>
 
     <button class="row"><svg class="icon"><use href="#i-new"/></svg>新建文稿</button>
-    <button class="row"><svg class="icon"><use href="#i-search"/></svg>搜索<span class="sub"><kbd>⌘K</kbd></span></button>
+    <!-- 搜索：输入后下面的文稿列表就地换成结果；Esc 或清空回到列表（#search、#search-empty、#search-hit） -->
+    <label class="search" id="search">
+      <svg class="icon"><use href="#i-search"/></svg>
+      <input id="q" placeholder="搜索" autocomplete="off" spellcheck="false">
+      <button class="search-clear" id="qClear" title="清除" hidden><svg class="icon"><use href="#i-x"/></svg></button>
+      <kbd class="search-kbd">⌘K</kbd>
+    </label>
 
     <div class="section"><span>文稿</span><div class="filters" id="filters"><button class="fdot tinted" data-c="butter" style="--tint: var(--butter)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="peach" style="--tint: var(--peach)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="rose" style="--tint: var(--rose)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="periwinkle" style="--tint: var(--periwinkle)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="sky" style="--tint: var(--sky)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="mint" style="--tint: var(--mint)" aria-pressed="false" title="只看这种颜色"><span></span></button></div></div>
     <nav class="docs">
@@ -559,6 +622,7 @@ kbd {
         <span class="doc-body"><div class="doc-title">2026/10/19 11:20</div><div class="doc-snip">和设计师聊的反馈</div></span>
       </button>
       <div class="empty" id="empty" hidden>没有这种颜色的文稿</div>
+      <div class="results" id="results"></div>
     </nav>
 
     <div class="me">
@@ -908,10 +972,74 @@ tidyBtn.onclick = () => {
 };
 syncTidy();
 
+// 搜索：标题命中在前，其余按最后修改时间；正文命中显示命中处前后的一行片段
+const q = $('q');
+const escapeHTML = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const markHits = (text, words) => {
+  let html = escapeHTML(text);
+  for (const w of words) html = html.split(escapeHTML(w)).join(`<span class="hit">${escapeHTML(w)}</span>`);
+  return html;
+};
+// 正文：原型里只用侧栏片段加当前文稿正文模拟
+const bodyOf = (d) => (d === docs[0] ? cm.textContent : d.querySelector('.doc-snip').textContent);
+const snippetAround = (text, w) => {
+  const i = text.indexOf(w);
+  if (i < 0) return text;
+  const from = Math.max(0, i - 8);
+  return (from > 0 ? '…' : '') + text.slice(from, i + w.length + 30);
+};
+const search = () => {
+  const words = q.value.trim().split(/\s+/).filter(Boolean);
+  $('search').classList.toggle('filled', !!q.value);
+  $('qClear').hidden = !q.value;
+  docList.classList.toggle('searching', words.length > 0);
+  const out = $('results');
+  out.innerHTML = '';
+  if (!words.length) { syncMore(); return; }
+  const found = docs.filter((d) => !d.dataset.deleted && (!filter || d.dataset.tint === filter))
+    .map((d) => ({ d, title: d.querySelector('.doc-title').textContent, body: bodyOf(d) }))
+    .filter((r) => words.every((w) => r.title.includes(w) || r.body.includes(w)))
+    .sort((a, b) => words.some((w) => b.title.includes(w)) - words.some((w) => a.title.includes(w)));
+  const head = document.createElement('div'); head.className = 'group';
+  head.textContent = found.length ? `找到 ${found.length} 篇` : '';
+  if (found.length) out.append(head);
+  for (const r of found) {
+    const el = document.createElement('button');
+    el.className = 'doc tinted'; el.dataset.tint = r.d.dataset.tint; paint(el, r.d.dataset.tint);
+    if (r.d === current) el.setAttribute('aria-current', 'true');
+    const w = words.find((x) => r.body.includes(x));
+    el.innerHTML = `<span class="swatch"></span><span class="doc-body"><div class="doc-title">${markHits(r.title, words)}</div><div class="doc-snip">${markHits(w ? snippetAround(r.body, w) : r.body, words)}</div></span>`;
+    el.onclick = () => openHits(words);
+    out.append(el);
+  }
+  if (!found.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = `没有找到「${q.value.trim()}」`; out.append(e); }
+  syncMore();
+};
+// 打开结果：正文里标出命中，滚到第一处
+const openHits = (words) => {
+  clearHits();
+  const walker = document.createTreeWalker(cm, NodeFilter.SHOW_TEXT);
+  const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    const w = words.find((x) => n.textContent.includes(x));
+    if (!w || n.parentElement.closest('.mk')) continue;
+    const span = document.createElement('span'); span.innerHTML = markHits(n.textContent, words);
+    n.replaceWith(...span.childNodes);
+  }
+  cm.querySelector('.hit')?.scrollIntoView({ block: 'center' });
+};
+const clearHits = () => cm.querySelectorAll('.hit').forEach((h) => h.replaceWith(h.textContent));
+q.oninput = search;
+q.onkeydown = (e) => { if (e.key === 'Escape') { q.value = ''; search(); q.blur(); } };
+$('qClear').onclick = (e) => { e.preventDefault(); q.value = ''; search(); q.focus(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'k' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); q.focus(); q.select(); } });
+cm.addEventListener('keydown', clearHits);
+
 // 直接打开某个状态：pc.html#voice、#rec、#dark、#colors、#scrolled、#menu、#rename、#toast、#select、#only-sky、#listdown、#rose 等颜色名、
 // #countdown（录音最后 30 秒）、#asr-error、#mic-denied、#no-mic（语音模式的提示），
 // #tidy-peek（悬停整理）、#tidy-peek-fill（落选：淡色底）、#tidying（整理中）、#tidying-pulse（落选：呼吸）、#tidied（整理完成）、
 // #tidy-empty（没有待整理的文字）、#tidy-error（整理失败），
+// #search（搜索「猫」）、#search-empty（没有结果）、#search-hit（打开结果后正文里的命中）、#search-hit-mark（落选：mark 色），
 // #source（落选变体）、#at-mark/li/task/quote/hr/code/table/img（光标所在行），可组合
 const hash = location.hash;
 if (hash.includes('source')) { cm.hidden = true; $('source-variant').hidden = false; }
@@ -935,6 +1063,9 @@ if (hash.includes('tidying-pulse')) root.classList.add('tidy-pulse');
 if (hash.includes('tidied')) { startTidy(); tidyDone(); }
 if (hash.includes('tidy-empty')) { pendings().forEach((p) => p.replaceWith(...p.childNodes)); syncTidy(); }
 voiceToasts['tidy-error'] = '整理失败，请稍后再试';
+if (hash.includes('search')) { q.value = hash.includes('search-empty') ? '露营' : '猫'; search(); if (!hash.includes('search-hit')) q.focus(); }
+if (hash.includes('search-hit')) openHits(['猫']);
+if (hash.includes('search-hit-mark')) root.classList.add('hit-mark');
 const vt = Object.keys(voiceToasts).find((k) => hash.includes(k));
 if (vt) { setInput(true); $('toastText').textContent = voiceToasts[vt]; $('undoBtn').hidden = true; $('toast').hidden = false; }
 if (hash.includes('colors')) $('palette').hidden = false;
@@ -951,6 +1082,46 @@ if (only) { filter = only[1]; applyFilter(); }
 if (hash.includes('select')) {
   const t = cm.querySelector('[data-at="mark"]').firstChild;
   getSelection().setBaseAndExtent(t, 6, t, 20);
+}
+
+// 原型专用：右下角的状态菜单。点一项跳到对应锚点并重新加载；「暗色」可以和其他状态组合。自动化截图时不显示。
+{
+  const groups = [
+    ['基础', [['默认', ''], ['滚动后吸顶', 'scrolled'], ['选中文字', 'select'], ['取色板', 'colors'], ['落选：全部显示源码', 'source']]],
+    ['侧栏', [['右键菜单', 'menu'], ['行内重命名', 'rename'], ['删除后撤销', 'toast'], ['只看天空色', 'only-sky'], ['列表滚到下面', 'listdown'], ['打开玫瑰色文稿', 'rose']]],
+    ['光标行', [['高亮和链接', 'at-mark'], ['列表', 'at-li'], ['待办', 'at-task'], ['引用', 'at-quote'], ['分隔线', 'at-hr'], ['代码块', 'at-code'], ['表格', 'at-table'], ['图片', 'at-img']]],
+    ['语音', [['语音模式', 'voice'], ['录音中', 'rec'], ['最后 30 秒', 'countdown'], ['识别中断', 'asr-error'], ['没有麦克风权限', 'mic-denied'], ['没有麦克风', 'no-mic']]],
+    ['整理', [['悬停整理', 'tidy-peek'], ['落选：淡色底', 'tidy-peek-fill'], ['整理中', 'tidying'], ['落选：呼吸', 'tidying-pulse'], ['整理完成', 'tidied'], ['没有待整理', 'tidy-empty'], ['整理失败', 'tidy-error']]],
+    ['搜索', [['搜索结果', 'search'], ['没有结果', 'search-empty'], ['正文命中', 'search-hit'], ['落选：mark 色', 'search-hit-mark']]],
+  ];
+  const dark = location.hash.slice(1).startsWith('dark');
+  const state = location.hash.slice(1).replace(/^dark-?/, '');
+  const go = (st, d) => { location.hash = [d ? 'dark' : '', st].filter(Boolean).join('-') || '_'; location.reload(); };
+  const btn = document.createElement('button');
+  btn.className = 'states-btn'; btn.innerHTML = '<svg class="icon"><use href="#i-more"/></svg>状态';
+  const menu = document.createElement('div');
+  menu.className = 'states'; menu.hidden = true;
+  const t = document.createElement('button');
+  t.className = 'toggle'; t.setAttribute('aria-pressed', dark); t.innerHTML = '暗色<span class="switch"></span>';
+  t.onclick = () => go(state, !dark);
+  menu.append(t);
+  for (const [name, items] of groups) {
+    const h = document.createElement('h4'); h.textContent = name; menu.append(h);
+    for (const [label, st] of items) {
+      const b = document.createElement('button');
+      b.innerHTML = `${label}<code>${st ? '#' + st : ''}</code>`;
+      if (st === state) b.setAttribute('aria-current', 'true');
+      b.onclick = () => go(st, dark);
+      menu.append(b);
+    }
+  }
+  btn.onclick = (e) => {
+    e.stopPropagation(); menu.hidden = !menu.hidden;
+    if (!menu.hidden) menu.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest' });
+  };
+  menu.onclick = (e) => e.stopPropagation();
+  document.addEventListener('click', () => { menu.hidden = true; });
+  if (!navigator.webdriver) document.body.append(btn, menu);
 }
 </script>
 </body>

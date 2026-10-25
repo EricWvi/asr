@@ -9,6 +9,7 @@ import { dictation } from "@/editor/dictation";
 import { imageUpload } from "@/editor/images";
 import { dedentListItem, exitEmptyListItem, indentListItem } from "@/editor/lists";
 import { livePreview } from "@/editor/live-preview";
+import { searchHits } from "@/editor/search-hits";
 import { highlightTag, markdownSupport } from "@/editor/syntax";
 import { initialTidyRanges, type Span, spansOf, tidyRanges } from "@/editor/tidy";
 import { registerEditor } from "@/lib/editor-focus";
@@ -83,6 +84,7 @@ export function Editor({
           imageUpload,
           dictation,
           tidyRanges,
+          searchHits,
           initialTidyRanges(initialSpans, initial.length),
           // Ahead of the Markdown keymap, which has high precedence.
           Prec.highest(

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -214,6 +215,15 @@ func TestDocumentsAPI(t *testing.T) {
 	}
 	if rec := do(t, h, "PATCH", path, `{"content":"短","tidy_ranges":[[7,9]]}`); rec.Code != http.StatusBadRequest {
 		t.Errorf("ranges past the end: status = %d", rec.Code)
+	}
+
+	// Search finds it by a word in the content, with a snippet.
+	rec = do(t, h, "GET", "/api/search?q="+url.QueryEscape("说话"), "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"snippet":"正文说话"`) {
+		t.Fatalf("search: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, h, "GET", "/api/search?q="+strings.Repeat("长", 201), ""); rec.Code != http.StatusBadRequest {
+		t.Errorf("long query: status = %d", rec.Code)
 	}
 
 	// Another user cannot see or touch it.

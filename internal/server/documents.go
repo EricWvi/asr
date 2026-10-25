@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"strconv"
+	"unicode/utf8"
 
 	"asr/internal/auth"
 	"asr/internal/store"
@@ -89,6 +90,24 @@ func (s *server) restoreDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// searchDocuments answers GET /api/search?q=... with matching documents,
+// each with a snippet around its first hit.
+func (s *server) searchDocuments(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	if utf8.RuneCountInString(q) > maxQuery {
+		writeError(w, http.StatusBadRequest, "搜索内容太长")
+		return
+	}
+	docs, err := s.store.SearchDocuments(r.Context(), auth.User(r.Context()).ID, q)
+	if err != nil {
+		writeStoreError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, docs)
+}
+
+const maxQuery = 200 // runes
 
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)

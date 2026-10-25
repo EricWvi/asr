@@ -23,6 +23,8 @@ type WorkspaceState = {
   renamingId: number | null;
   /** On a phone, the list shows instead of the open document. */
   listOpen: boolean;
+  /** The sidebar search; the list shows results while it is not blank. */
+  query: string;
 };
 
 function readCurrent() {
@@ -40,6 +42,7 @@ export const useWorkspace = create<WorkspaceState>(() => ({
   mode: "keyboard",
   renamingId: null,
   listOpen: false,
+  query: "",
 }));
 
 useWorkspace.subscribe((s, prev) => {
@@ -77,8 +80,8 @@ function leaveCurrent() {
   });
 }
 
-/** Opens a document with the cursor at the end of its text. */
-export function openDocument(id: number) {
+/** Opens a document with the cursor at the end of its text, or on the first hit of the search words. */
+export function openDocument(id: number, find?: string[]) {
   if (id !== useWorkspace.getState().currentId) {
     leaveCurrent();
     // Load it fresh unless this page still holds unsaved edits to it.
@@ -86,7 +89,7 @@ export function openDocument(id: number) {
     useWorkspace.setState({ currentId: id });
   }
   useWorkspace.setState({ listOpen: false });
-  focusEditor("end", id);
+  focusEditor(find?.length ? { find } : "end", id);
 }
 
 let creating: Promise<void> | null = null;

@@ -1,6 +1,7 @@
 import { FilePlusIcon, MicIcon } from "lucide-react";
 
 import { DocList } from "@/components/doc-list";
+import { SearchBox } from "@/components/search-box";
 import { UserMenu } from "@/components/user-menu";
 import { COLORS, type User } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ export function Sidebar({ user }: { user: User }) {
         <FilePlusIcon className="size-4 text-ink-2" strokeWidth={1.75} />
         新建文稿
       </button>
+      <SearchBox />
 
       <div className="flex items-center justify-between pt-3.5 pr-1 pb-1 pl-2.5 text-[13px] font-semibold">
         <span>文稿</span>

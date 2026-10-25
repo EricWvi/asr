@@ -51,6 +51,7 @@ func New(st *store.Store, authn *auth.Service, web fs.FS, opts Options) (http.Ha
 
 	private.HandleFunc("GET /api/me", s.getMe)
 	private.HandleFunc("GET /api/documents", s.listDocuments)
+	private.HandleFunc("GET /api/search", s.searchDocuments)
 	private.HandleFunc("POST /api/documents", s.createDocument)
 	private.HandleFunc("GET /api/documents/{id}", s.getDocument)
 	private.HandleFunc("PATCH /api/documents/{id}", s.updateDocument)

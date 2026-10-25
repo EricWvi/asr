@@ -71,6 +71,28 @@ var migrations = []migration{
 	-- into content. Clients keep it in step with content.
 	ALTER TABLE documents ADD COLUMN tidy_ranges TEXT NOT NULL DEFAULT '[]';
 	`),
+	execSQL(`
+	-- Full-text index over titles and content. The trigram tokenizer finds
+	-- any substring of three or more characters, which suits Chinese
+	-- without word segmentation. Triggers keep it in step with documents;
+	-- deleted documents stay indexed and are filtered out by the query.
+	CREATE VIRTUAL TABLE documents_fts USING fts5(
+		title, content,
+		content = 'documents', content_rowid = 'id',
+		tokenize = 'trigram'
+	);
+	CREATE TRIGGER documents_fts_insert AFTER INSERT ON documents BEGIN
+		INSERT INTO documents_fts (rowid, title, content) VALUES (new.id, new.title, new.content);
+	END;
+	CREATE TRIGGER documents_fts_delete AFTER DELETE ON documents BEGIN
+		INSERT INTO documents_fts (documents_fts, rowid, title, content) VALUES ('delete', old.id, old.title, old.content);
+	END;
+	CREATE TRIGGER documents_fts_update AFTER UPDATE OF title, content ON documents BEGIN
+		INSERT INTO documents_fts (documents_fts, rowid, title, content) VALUES ('delete', old.id, old.title, old.content);
+		INSERT INTO documents_fts (rowid, title, content) VALUES (new.id, new.title, new.content);
+	END;
+	INSERT INTO documents_fts (documents_fts) VALUES ('rebuild');
+	`),
 }
 
 func migrate(db *sql.DB) error {
