@@ -3,15 +3,19 @@ import { type EditorState, type Range, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { notifyError } from "@/lib/toast";
+import { MathWidget, MermaidWidget, TableWidget, tableModel } from "./embeds";
 
 /*
  * Live preview, as in design/pc.html: lines touched by the selection show
  * their Markdown source with the marks in the document's deep tint; every
  * other line hides the marks and shows only the rendered look. Task boxes
  * stay rendered everywhere, and a fenced code block shows its fences while
- * the cursor is anywhere inside it.
+ * the cursor is anywhere inside it. Math blocks, Mermaid charts and tables
+ * likewise show their source while the cursor is inside them, with math
+ * and charts previewed below it; elsewhere they are replaced by the
+ * rendering (editor/embeds.ts).
  *
- * Images render as block widgets, which only a state field may provide, so
+ * Images and those blocks render as block widgets, which only a state field may provide, so
  * the whole set is rebuilt here on every change of text, selection or
  * parse tree. Notes are short enough for that.
  */
@@ -181,11 +185,22 @@ function build(state: EditorState): DecorationSet {
   const doc = state.doc;
   const active = activeLines(state);
   const out: Range<Decoration>[] = [];
-  /** Lines inside code blocks: their blank lines are not compressed. */
+  /** Lines inside code and math blocks: their blank lines are not compressed. */
   const codeLines = new Set<number>();
   /** Lines that already got a list line decoration. */
   const listLines = new Set<number>();
   const isActive = (pos: number) => active.has(doc.lineAt(pos).number);
+
+  const anyActive = (first: number, last: number) => {
+    for (let n = first; n <= last; n++) if (active.has(n)) return true;
+    return false;
+  };
+  // Replaces whole lines with a rendered block.
+  const replaceLines = (first: number, last: number, widget: WidgetType) =>
+    out.push(Decoration.replace({ widget, block: true }).range(doc.line(first).from, doc.line(last).to));
+  // Shows a rendered block below the line.
+  const below = (n: number, widget: WidgetType) =>
+    out.push(Decoration.widget({ widget, block: true, side: 1 }).range(doc.line(n).to));
 
   // Hides [from, to) unless the cursor is on that line.
   const hideMark = (from: number, to: number) => {
@@ -238,16 +253,26 @@ function build(state: EditorState): DecorationSet {
           return;
         }
         case "FencedCode":
-        case "CodeBlock": {
+        case "CodeBlock":
+        case "Frontmatter": {
           const first = doc.lineAt(ref.from).number;
           const last = doc.lineAt(ref.to).number;
-          let open = false;
-          for (let n = first; n <= last; n++) if (active.has(n)) open = true;
-          const fenced = ref.name == "FencedCode";
+          const open = anyActive(first, last);
+          const fenced = ref.name != "CodeBlock";
           const marks = node.getChildren("CodeMark");
           const closed = fenced && marks.length > 1;
+          const info = node.getChild("CodeInfo");
+          const label = ref.name == "Frontmatter" ? "yaml" : info ? doc.sliceString(info.from, info.to) : "";
+          const from = first < last ? doc.line(first + 1).from : ref.to;
+          const to = closed ? doc.line(last).from - 1 : ref.to;
+          const code = fenced && from <= to ? doc.sliceString(from, to) : "";
+          const chart = fenced && /^mermaid\b/i.test(label) ? new MermaidWidget(code) : null;
+          for (let n = first; n <= last; n++) codeLines.add(n);
+          if (chart && !open) {
+            replaceLines(first, last, chart);
+            return false;
+          }
           for (let n = first; n <= last; n++) {
-            codeLines.add(n);
             const l = doc.line(n);
             let cls = "cm-md-code";
             if (n == first) cls += " cm-md-code-first";
@@ -256,11 +281,6 @@ function build(state: EditorState): DecorationSet {
             if (fence && !open) {
               if (n == first) {
                 cls += " cm-md-fence-first";
-                const info = node.getChild("CodeInfo");
-                const label = info ? doc.sliceString(info.from, info.to) : "";
-                const from = first < last ? doc.line(first + 1).from : ref.to;
-                const to = closed ? doc.line(last).from - 1 : ref.to;
-                const code = from <= to ? doc.sliceString(from, to) : "";
                 out.push(Decoration.replace({ widget: new FenceHeadWidget(label, code) }).range(l.from, l.to));
               } else {
                 cls += " cm-md-fence";
@@ -269,6 +289,32 @@ function build(state: EditorState): DecorationSet {
             }
             out.push(line(cls).range(l.from));
           }
+          if (chart) below(last, chart);
+          return false;
+        }
+        case "BlockMath": {
+          const first = doc.lineAt(ref.from).number;
+          const last = doc.lineAt(ref.to).number;
+          const marks = node.getChildren("MathMark");
+          const end = marks.length > 1 ? marks[marks.length - 1]!.from : ref.to;
+          const widget = new MathWidget(doc.sliceString(marks[0]!.to, end).trim(), true);
+          for (let n = first; n <= last; n++) codeLines.add(n);
+          if (!anyActive(first, last)) {
+            replaceLines(first, last, widget);
+            return false;
+          }
+          for (let n = first; n <= last; n++) out.push(line("cm-md-math-src").range(doc.line(n).from));
+          below(last, widget);
+          return false;
+        }
+        case "InlineMath": {
+          if (isActive(ref.from) || isActive(ref.to)) {
+            out.push(Decoration.mark({ class: "cm-md-math-src" }).range(ref.from, ref.to));
+            return false;
+          }
+          const [open, close] = node.getChildren("MathMark");
+          const widget = new MathWidget(doc.sliceString(open!.to, close!.from), false);
+          out.push(Decoration.replace({ widget }).range(ref.from, ref.to));
           return false;
         }
         case "HorizontalRule": {
@@ -278,6 +324,10 @@ function build(state: EditorState): DecorationSet {
         case "Table": {
           const first = doc.lineAt(ref.from).number;
           const last = doc.lineAt(ref.to).number;
+          if (!anyActive(first, last)) {
+            replaceLines(first, last, new TableWidget(doc.sliceString(ref.from, ref.to), tableModel(state, node)));
+            return false;
+          }
           for (let n = first; n <= last; n++) out.push(line("cm-md-table").range(doc.line(n).from));
           return;
         }

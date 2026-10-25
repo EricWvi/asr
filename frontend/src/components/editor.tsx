@@ -10,7 +10,7 @@ import { imageUpload } from "@/editor/images";
 import { dedentListItem, exitEmptyListItem, indentListItem } from "@/editor/lists";
 import { livePreview } from "@/editor/live-preview";
 import { searchHits } from "@/editor/search-hits";
-import { highlightTag, markdownSupport } from "@/editor/syntax";
+import { codeStyle, highlightTag, markdownSupport } from "@/editor/syntax";
 import { initialTidyRanges, type Span, spansOf, tidyRanges } from "@/editor/tidy";
 import { registerEditor } from "@/lib/editor-focus";
 import { setPending } from "@/voice/tidy";
@@ -80,6 +80,7 @@ export function Editor({
           EditorView.lineWrapping,
           markdownSupport(),
           syntaxHighlighting(markdownStyle),
+          syntaxHighlighting(codeStyle),
           livePreview,
           imageUpload,
           dictation,

@@ -439,6 +439,102 @@
   font: 14px/1.85 "SF Mono", ui-monospace, Menlo, monospace;
 }
 
+/* Rendered tables, away from the cursor. */
+.cm-md-table-wrap {
+  overflow-x: auto;
+  padding: 4px 0;
+}
+.cm-md-table-wrap table {
+  border-collapse: collapse;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.cm-md-table-wrap th,
+.cm-md-table-wrap td {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.cm-md-table-wrap th {
+  font-weight: 600;
+  background: var(--quiet);
+}
+.cm-md-table-wrap a[href] {
+  color: var(--blue);
+}
+.cm-md-table-wrap img {
+  max-height: 120px;
+}
+
+/* Math: KaTeX away from the cursor, the TeX source in monospace on it. */
+.cm-md-math .katex {
+  font-size: 1.05em;
+}
+.cm-md-math-block {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 0;
+}
+.cm-md-math-block .katex-display {
+  margin: 0;
+}
+.cm-md-math-src,
+.cm-editor .cm-line.cm-md-math-src {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+/* Mermaid charts, fitted to the column width. */
+.cm-md-chart {
+  padding: 12px;
+  margin: 4px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-align: center;
+}
+.cm-md-chart svg {
+  max-width: 100%;
+  height: auto;
+}
+.cm-md-chart-error {
+  font-size: 13px;
+  color: var(--ink-3);
+  background: var(--quiet);
+  border-color: transparent;
+  text-align: left;
+}
+/* KaTeX or Mermaid still loading: the source, dimmed. */
+.cm-md-loading {
+  white-space: pre-wrap;
+  font: 13px/1.6 "SF Mono", ui-monospace, Menlo, monospace;
+  color: var(--ink-3);
+  text-align: left;
+}
+
+/* Token colours inside fenced code (codeStyle in editor/syntax.ts), after GitHub's themes. */
+.cm-md-code {
+  --hl-keyword: #cf222e;
+  --hl-string: #0a3069;
+  --hl-comment: #6e7781;
+  --hl-constant: #0550ae;
+  --hl-function: #8250df;
+  --hl-type: #953800;
+  --hl-property: #0550ae;
+  --hl-inserted: #116329;
+  --hl-deleted: #82071e;
+}
+.cm-md-code .hl-keyword { color: var(--hl-keyword); }
+.cm-md-code .hl-string { color: var(--hl-string); }
+.cm-md-code .hl-comment { color: var(--hl-comment); }
+.cm-md-code .hl-constant { color: var(--hl-constant); }
+.cm-md-code .hl-function { color: var(--hl-function); }
+.cm-md-code .hl-type { color: var(--hl-type); }
+.cm-md-code .hl-property { color: var(--hl-property); }
+.cm-md-code .hl-inserted { color: var(--hl-inserted); }
+.cm-md-code .hl-deleted { color: var(--hl-deleted); }
+.cm-md-code .hl-heading { color: var(--hl-constant); font-weight: 600; }
+
 /* Images */
 .cm-md-img {
   padding: 6px 0;
@@ -467,6 +563,17 @@
   }
   .cm-md-icode {
     background: rgb(255 255 255 / 0.07);
+  }
+  .cm-md-code {
+    --hl-keyword: #ff7b72;
+    --hl-string: #a5d6ff;
+    --hl-comment: #8b949e;
+    --hl-constant: #79c0ff;
+    --hl-function: #d2a8ff;
+    --hl-type: #ffa657;
+    --hl-property: #79c0ff;
+    --hl-inserted: #aff5b4;
+    --hl-deleted: #ffdcd7;
   }
 }
 
