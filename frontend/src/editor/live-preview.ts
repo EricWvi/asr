@@ -2,6 +2,7 @@ import { syntaxTree } from "@codemirror/language";
 import { type EditorState, type Range, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
+import { notifyError } from "@/lib/toast";
 
 /*
  * Live preview, as in design/pc.html: lines touched by the selection show
@@ -87,17 +88,44 @@ class RuleWidget extends WidgetType {
   }
 }
 
-class FenceLabelWidget extends WidgetType {
-  constructor(readonly label: string) {
+const copyIcon =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
+const checkIcon =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+/** The opening fence away from the cursor: the language on the left, a copy button on the right. */
+class FenceHeadWidget extends WidgetType {
+  constructor(
+    readonly label: string,
+    readonly code: string,
+  ) {
     super();
   }
-  eq(other: FenceLabelWidget) {
-    return other.label == this.label;
+  eq(other: FenceHeadWidget) {
+    return other.label == this.label && other.code == this.code;
   }
   toDOM() {
     const el = document.createElement("span");
-    el.className = "cm-md-lang";
-    el.textContent = this.label;
+    el.className = "cm-md-fence-head";
+    const lang = el.appendChild(document.createElement("span"));
+    lang.className = "cm-md-lang";
+    lang.textContent = this.label;
+    const btn = el.appendChild(document.createElement("button"));
+    btn.type = "button";
+    btn.className = "cm-md-copy";
+    btn.title = "复制";
+    btn.innerHTML = copyIcon;
+    // Keeps the cursor where it is, so the block stays rendered.
+    btn.addEventListener("mousedown", (e) => e.preventDefault());
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(this.code);
+        btn.innerHTML = checkIcon;
+        setTimeout(() => (btn.innerHTML = copyIcon), 1500);
+      } catch (err) {
+        notifyError(err, "复制失败");
+      }
+    });
     return el;
   }
 }
@@ -226,15 +254,17 @@ function build(state: EditorState): DecorationSet {
             if (n == last) cls += " cm-md-code-last";
             const fence = fenced && ((n == first) || (n == last && closed));
             if (fence && !open) {
-              cls += " cm-md-fence";
-              if (l.length) {
-                const info = n == first ? node.getChild("CodeInfo") : null;
+              if (n == first) {
+                cls += " cm-md-fence-first";
+                const info = node.getChild("CodeInfo");
                 const label = info ? doc.sliceString(info.from, info.to) : "";
-                out.push(
-                  label
-                    ? Decoration.replace({ widget: new FenceLabelWidget(label) }).range(l.from, l.to)
-                    : hide.range(l.from, l.to),
-                );
+                const from = first < last ? doc.line(first + 1).from : ref.to;
+                const to = closed ? doc.line(last).from - 1 : ref.to;
+                const code = from <= to ? doc.sliceString(from, to) : "";
+                out.push(Decoration.replace({ widget: new FenceHeadWidget(label, code) }).range(l.from, l.to));
+              } else {
+                cls += " cm-md-fence";
+                if (l.length) out.push(hide.range(l.from, l.to));
               }
             }
             out.push(line(cls).range(l.from));

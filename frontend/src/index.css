@@ -336,7 +336,7 @@
   border-bottom-right-radius: 12px;
 }
 
-/* Code blocks: away from the cursor the fences shrink to padding and the language sits top right. */
+/* Code blocks: away from the cursor the opening fence becomes a header with the language and a copy button, and the closing fence shrinks to padding. */
 .cm-editor .cm-line.cm-md-code {
   position: relative;
   padding: 0 16px;
@@ -358,13 +358,38 @@
   padding-top: 0;
   padding-bottom: 0;
 }
+.cm-editor .cm-line.cm-md-fence-first {
+  height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+/* Inline, so it shares the line with CodeMirror's widget buffers instead of wrapping below them. */
+.cm-md-fence-head {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  vertical-align: top;
+}
 .cm-md-lang {
-  position: absolute;
-  right: 12px;
-  top: 8px;
   font-size: 11.5px;
   line-height: 1;
   color: var(--ink-3);
+}
+.cm-md-copy {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: -6px;
+  border-radius: 6px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.cm-md-copy:hover {
+  color: var(--ink-2);
+  background: rgb(0 0 0 / 0.05);
 }
 .cm-md-icode {
   padding: 2px 6px;
