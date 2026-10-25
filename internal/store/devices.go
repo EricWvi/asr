@@ -82,10 +82,10 @@ func (s *Store) DeviceUser(ctx context.Context, token string) (Device, User, err
 	var d Device
 	var u User
 	err := s.db.QueryRowContext(ctx, `
-		SELECT d.id, d.name, d.platform, d.created_at, d.last_used_at, u.id, u.name, u.email
+		SELECT d.id, d.name, d.platform, d.created_at, d.last_used_at, u.id, u.name, u.email, u.avatar
 		FROM devices d JOIN users u ON u.id = d.user_id
 		WHERE d.token_hash = ?`, hashToken(token)).
-		Scan(&d.ID, &d.Name, &d.Platform, &d.CreatedAt, &d.LastUsedAt, &u.ID, &u.Name, &u.Email)
+		Scan(&d.ID, &d.Name, &d.Platform, &d.CreatedAt, &d.LastUsedAt, &u.ID, &u.Name, &u.Email, &u.Avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return d, u, ErrNotFound
 	}

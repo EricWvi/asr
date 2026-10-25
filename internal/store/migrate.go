@@ -108,6 +108,10 @@ var migrations = []migration{
 	);
 	CREATE INDEX devices_user ON devices (user_id);
 	`),
+	execSQL(`
+	-- The ID of the uploaded avatar; its file is avatars/<user>/<id>.
+	ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT '';
+	`),
 }
 
 func migrate(db *sql.DB) error {

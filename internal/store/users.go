@@ -16,6 +16,8 @@ type User struct {
 	ID    int64  `json:"-"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
+	// Avatar is the ID of the uploaded avatar, "" without one.
+	Avatar string `json:"-"`
 }
 
 // Identity is what the identity provider vouches for. Issuer and Subject
@@ -37,7 +39,7 @@ func (s *Store) UpsertUser(ctx context.Context, id Identity) (User, error) {
 	u := User{Name: id.Name, Email: id.Email}
 	err := s.inTx(ctx, func(tx *sql.Tx) error {
 		err := tx.QueryRowContext(ctx,
-			`SELECT id FROM users WHERE issuer = ? AND subject = ?`, id.Issuer, id.Subject).Scan(&u.ID)
+			`SELECT id, avatar FROM users WHERE issuer = ? AND subject = ?`, id.Issuer, id.Subject).Scan(&u.ID, &u.Avatar)
 		if err == nil {
 			_, err = tx.ExecContext(ctx,
 				`UPDATE users SET name = ?, email = ? WHERE id = ?`, id.Name, id.Email, u.ID)
@@ -79,9 +81,9 @@ func (s *Store) SessionUser(ctx context.Context, token string) (User, time.Time,
 	var u User
 	var lastSeen int64
 	err := s.db.QueryRowContext(ctx, `
-		SELECT u.id, u.name, u.email, s.last_seen_at
+		SELECT u.id, u.name, u.email, u.avatar, s.last_seen_at
 		FROM sessions s JOIN users u ON u.id = s.user_id
-		WHERE s.token_hash = ?`, hashToken(token)).Scan(&u.ID, &u.Name, &u.Email, &lastSeen)
+		WHERE s.token_hash = ?`, hashToken(token)).Scan(&u.ID, &u.Name, &u.Email, &u.Avatar, &lastSeen)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, time.Time{}, ErrNotFound
 	}

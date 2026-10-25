@@ -1,6 +1,8 @@
 export type User = {
   name: string;
   email: string;
+  /** "" without an avatar; the URL changes with each upload. */
+  avatar_url: string;
 };
 
 export const COLORS = ["butter", "peach", "rose", "periwinkle", "sky", "mint"] as const;
@@ -70,6 +72,8 @@ export const api = {
   /** Uploads pasted or dropped image bytes; the URL goes into the Markdown. */
   uploadImage: (file: Blob) => request<{ id: string; url: string }>("POST", "/api/images", file),
   me: () => request<User>("GET", "/api/me"),
+  setAvatar: (image: Blob) => request<{ avatar_url: string }>("PUT", "/api/me/avatar", image),
+  deleteAvatar: () => request<null>("DELETE", "/api/me/avatar"),
   documents: () => request<DocSummary[]>("GET", "/api/documents"),
   /** Documents holding every word; the snippet is the line around the first hit. */
   search: (q: string) => request<DocSummary[]>("GET", `/api/search?q=${encodeURIComponent(q)}`),

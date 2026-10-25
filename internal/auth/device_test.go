@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -193,5 +194,23 @@ func TestDeviceApprovalChecks(t *testing.T) {
 	code := svc.flows.addCode(issued{userID: 1, req: req, expires: time.Now().Add(-time.Second)})
 	if rec := exchange(h, code, "v"); rec.Code != http.StatusBadRequest {
 		t.Fatalf("expired code: status = %d", rec.Code)
+	}
+}
+
+func TestDeviceConfirmShowsAvatar(t *testing.T) {
+	svc, h := newService(t, Config{DevUser: "eric"})
+	rec := serve(h, "GET", deviceLoginURL("mac", macRedirect, "verifier-1"))
+	cookie := http.Header{"Cookie": {approvalCookie + "=" + cookieOf(rec, approvalCookie)}}
+	if body := request(h, "GET", "/auth/device/confirm", "", cookie).Body.String(); strings.Contains(body, "<img") || !strings.Contains(body, ">E</span>") {
+		t.Fatalf("without avatar: %s", body)
+	}
+	png := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+	if _, err := svc.store.SetAvatar(context.Background(), svc.devResolved.ID, png); err != nil {
+		t.Fatal(err)
+	}
+	// The avatar is read afresh, though the approval holds the user from before.
+	want := `<img src="data:image/png;base64,` + base64.StdEncoding.EncodeToString(png) + `"`
+	if body := request(h, "GET", "/auth/device/confirm", "", cookie).Body.String(); !strings.Contains(body, want) {
+		t.Fatalf("with avatar: %s", body)
 	}
 }

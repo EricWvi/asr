@@ -288,3 +288,52 @@ func TestImagesAPI(t *testing.T) {
 		t.Errorf("bob gets alice's image: status = %d", rec.Code)
 	}
 }
+
+func TestAvatarAPI(t *testing.T) {
+	h := newTest(t)
+	png := "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+	var u struct {
+		AvatarURL *string `json:"avatar_url"`
+	}
+	if json.Unmarshal(do(t, h, "GET", "/api/me", "").Body.Bytes(), &u); u.AvatarURL == nil || *u.AvatarURL != "" {
+		t.Fatalf("me before upload: %+v", u)
+	}
+
+	rec := do(t, h, "PUT", "/api/me/avatar", png)
+	var set struct {
+		AvatarURL string `json:"avatar_url"`
+	}
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &set) != nil || !strings.HasPrefix(set.AvatarURL, "/api/avatars/") {
+		t.Fatalf("upload: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	if json.Unmarshal(do(t, h, "GET", "/api/me", "").Body.Bytes(), &u); *u.AvatarURL != set.AvatarURL {
+		t.Fatalf("me after upload: %v, want %s", *u.AvatarURL, set.AvatarURL)
+	}
+	rec = do(t, h, "GET", set.AvatarURL, "")
+	if rec.Code != http.StatusOK || rec.Body.String() != png || rec.Header().Get("Content-Type") != "image/png" ||
+		rec.Header().Get("Cache-Control") != "private, max-age=31536000, immutable" {
+		t.Fatalf("get: status = %d, headers = %v", rec.Code, rec.Header())
+	}
+
+	if rec := do(t, h, "PUT", "/api/me/avatar", "<svg/>"); rec.Code != http.StatusBadRequest {
+		t.Errorf("svg upload: status = %d", rec.Code)
+	}
+	if rec := do(t, h, "PUT", "/api/me/avatar", png+strings.Repeat("x", store.MaxAvatarSize)); rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("large upload: status = %d", rec.Code)
+	}
+	h.session = h.signIn(t, "bob")
+	if rec := do(t, h, "GET", set.AvatarURL, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("bob gets alice's avatar: status = %d", rec.Code)
+	}
+	h.session = h.signIn(t, "alice")
+
+	if rec := do(t, h, "DELETE", "/api/me/avatar", ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete: status = %d", rec.Code)
+	}
+	if rec := do(t, h, "GET", set.AvatarURL, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("deleted avatar: status = %d", rec.Code)
+	}
+	if json.Unmarshal(do(t, h, "GET", "/api/me", "").Body.Bytes(), &u); *u.AvatarURL != "" {
+		t.Errorf("me after delete: %v", *u.AvatarURL)
+	}
+}

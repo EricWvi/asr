@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
@@ -220,7 +221,28 @@ func (s *Service) deviceConfirm(w http.ResponseWriter, r *http.Request) {
 		Platform: a.req.Platform,
 		User:     a.user.Name,
 		Email:    a.user.Email,
+		Avatar:   s.avatarSrc(r.Context(), a.user.ID),
 	})
+}
+
+// avatarSrc inlines the user's avatar, as the page may be shown without a
+// web session to fetch it with. Empty without one.
+func (s *Service) avatarSrc(ctx context.Context, userID int64) template.URL {
+	u, err := s.store.User(ctx, userID)
+	if err != nil {
+		slog.Error("look up user", "err", err)
+		return ""
+	}
+	data, err := s.store.ReadAvatar(u)
+	if err != nil {
+		slog.Error("read avatar", "err", err)
+		return ""
+	}
+	if data == nil {
+		return ""
+	}
+	// Built from sniffed bytes, so safe to mark as a URL.
+	return template.URL("data:" + http.DetectContentType(data) + ";base64," + base64.StdEncoding.EncodeToString(data))
 }
 
 func (s *Service) deviceApprove(w http.ResponseWriter, r *http.Request) {
@@ -312,6 +334,7 @@ type devicePageData struct {
 	Platform string
 	User     string
 	Email    string
+	Avatar   template.URL
 	Redirect string
 	Title    string
 	Message  string
@@ -352,14 +375,14 @@ body{display:grid;place-items:center;padding:24px;background:var(--bg);color:var
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}button:focus:not(:focus-visible){outline:none}
 svg{display:block}.icon{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 .card{width:100%;max-width:380px;padding:28px 28px 24px;border-radius:20px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line),var(--shadow-md)}
-.brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
-.brand-mark{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--surface);box-shadow:var(--shadow-sm);color:var(--accent)}
-.brand-name{font:600 16px/1 "Songti SC","Noto Serif SC","Source Han Serif SC",serif;letter-spacing:.06em}
+.brand{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.brand-mark{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--surface);box-shadow:var(--shadow-sm)}.logo{width:24px}
+.brand-name{font:700 18px/1 "Songti SC","Noto Serif SC","Source Han Serif SC",serif;letter-spacing:.06em}
 h1{margin:0 0 16px;font-size:18px;font-weight:600;line-height:1.4}
 .rows{border-radius:12px;box-shadow:inset 0 0 0 1px var(--line)}
 .item{display:flex;align-items:center;gap:12px;padding:12px 14px}.item+.item{border-top:1px solid var(--line)}
 .item-icon{width:32px;height:32px;border-radius:9px;flex:none;display:grid;place-items:center;background:var(--chip);color:var(--ink-2)}
-.avatar{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:13px;font-weight:600;background:var(--periwinkle);color:#1d1d1f}
+.avatar{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;overflow:hidden;font-size:13px;font-weight:600;background:var(--periwinkle);color:#1d1d1f}.avatar img{width:100%;height:100%;object-fit:cover}
 .item-body{min-width:0}.item-name,.item-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.item-sub{font-size:12px;color:var(--ink-2)}
 .actions{display:flex;gap:10px;margin-top:22px}
 .btn{flex:1;height:40px;border-radius:10px;font-size:14px;font-weight:500;transition:background .15s,transform .12s}.btn:active{transform:scale(.98)}
@@ -372,13 +395,13 @@ h1{margin:0 0 16px;font-size:18px;font-weight:600;line-height:1.4}
 .result p a{color:var(--accent);text-decoration:none}.result p a:hover{text-decoration:underline}
 </style></head><body>
 <main class="card">
-<div class="brand"><div class="brand-mark"><svg class="icon" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div><div class="brand-name">听写</div></div>
+<div class="brand"><div class="brand-mark"><svg class="logo" viewBox="0 1 398 383"><path fill="#fde8a7" d="M0.0 123.5A58.5 58.5 0 0 1 35.3 69.8L186.1 4.6A45.8 45.8 0 0 1 250.0 46.6L250.0 334.3A49.8 49.8 0 0 1 183.5 381.2L36.5 328.6A55.0 55.0 0 0 1 0.0 276.8Z"/><path fill="#fec6ab" d="M264.8 48.8A9.8 9.8 0 0 1 274.5 39.0L281.0 39.0A46.0 46.0 0 0 1 327.0 85.0L327.0 298.8A46.0 46.0 0 0 1 281.0 344.8L274.5 344.8A9.8 9.8 0 0 1 264.8 335.0Z"/><path fill="#bcc6fa" d="M341.8 87.0A8.2 8.2 0 0 1 350.0 78.8L355.2 78.8A42.5 42.5 0 0 1 397.8 121.2L397.8 259.8A42.5 42.5 0 0 1 355.2 302.2L350.0 302.2A8.2 8.2 0 0 1 341.8 294.0Z"/><path fill="#f5c258" d="M57.6 132.4L179.6 116.2A20.0 20.0 0 1 1 183.8 155.9L61.0 165.2A16.5 16.5 0 0 1 57.6 132.4Z"/><path fill="#f5c258" d="M59.1 184.8L154.8 183.8A18.5 18.5 0 1 1 154.3 220.7L58.7 217.2A16.2 16.2 0 0 1 59.1 184.8Z"/><path fill="#f5c258" d="M60.9 238.3L99.7 241.0A17.0 17.0 0 1 1 96.9 274.9L58.2 271.2A16.5 16.5 0 0 1 60.9 238.3Z"/></svg></div><div class="brand-name">听·写</div></div>
 {{if eq .Kind "ask"}}
 <h1>允许这台设备登录？</h1>
 <div class="rows">
 <div class="item"><span class="item-icon">{{if eq .Platform "android"}}<svg class="icon" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>{{else}}<svg class="icon" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg>{{end}}</span>
 <span class="item-body"><div class="item-name">{{.Device}}</div><div class="item-sub">{{if eq .Platform "android"}}安卓客户端{{else}}Mac 客户端{{end}}</div></span></div>
-<div class="item"><span class="avatar">{{.Initial}}</span><span class="item-body"><div class="item-name">{{.User}}</div>{{if .Email}}<div class="item-sub">{{.Email}}</div>{{end}}</span></div>
+<div class="item"><span class="avatar">{{if .Avatar}}<img src="{{.Avatar}}" alt="">{{else}}{{.Initial}}{{end}}</span><span class="item-body"><div class="item-name">{{.User}}</div>{{if .Email}}<div class="item-sub">{{.Email}}</div>{{end}}</span></div>
 </div>
 <form method="post" action="/auth/device/approve" class="actions">
 <input type="hidden" name="approval" value="{{.Approval}}">

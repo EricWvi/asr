@@ -58,6 +58,9 @@ func New(st *store.Store, authn *auth.Service, web fs.FS, opts Options) (http.Ha
 	mux.Handle("/", static)
 
 	private.HandleFunc("GET /api/me", s.getMe)
+	private.HandleFunc("PUT /api/me/avatar", s.setAvatar)
+	private.HandleFunc("DELETE /api/me/avatar", s.deleteAvatar)
+	private.HandleFunc("GET /api/avatars/{id}", s.getAvatar)
 	private.HandleFunc("GET /api/documents", s.listDocuments)
 	private.HandleFunc("GET /api/search", s.searchDocuments)
 	private.HandleFunc("POST /api/documents", s.createDocument)
@@ -83,9 +86,23 @@ func (s *server) getVersion(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"version": s.opts.Version})
 }
 
+// me is the signed-in user as the web app sees it.
+type me struct {
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+}
+
 func (s *server) getMe(w http.ResponseWriter, r *http.Request) {
+	// Read afresh: the user in the context may be cached (dev_user) and
+	// miss a new avatar.
+	u, err := s.store.User(r.Context(), auth.User(r.Context()).ID)
+	if err != nil {
+		writeStoreError(w, r, err)
+		return
+	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, auth.User(r.Context()))
+	writeJSON(w, http.StatusOK, me{Name: u.Name, Email: u.Email, AvatarURL: u.AvatarURL()})
 }
 
 func writeStoreError(w http.ResponseWriter, r *http.Request, err error) {
