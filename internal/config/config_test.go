@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -46,7 +47,7 @@ func TestLoadOIDC(t *testing.T) {
 	want.Listen = ":9000"
 	want.PublicURL = "https://asr.test"
 	want.OIDC = OIDC{Issuer: "https://auth.test", ClientID: "asr", ClientSecret: "secret"}
-	if cfg != want {
+	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("got %+v, want %+v", cfg, want)
 	}
 }
@@ -103,5 +104,24 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		if _, err := Load(write(t, content)); err == nil {
 			t.Errorf("expected error for:\n%s", content)
 		}
+	}
+}
+
+func TestLoadTidyExtraBody(t *testing.T) {
+	cfg, err := Load(write(t, `dev_user: eric
+tidy:
+  base_url: https://api.deepseek.com
+  model: deepseek-flash
+  extra_body:
+    thinking:
+      type: disabled
+    temperature: 0.3
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{"thinking": map[string]any{"type": "disabled"}, "temperature": 0.3}
+	if !reflect.DeepEqual(cfg.Tidy.ExtraBody, want) {
+		t.Fatalf("extra_body = %#v", cfg.Tidy.ExtraBody)
 	}
 }

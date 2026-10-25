@@ -180,3 +180,44 @@ func TestSnippet(t *testing.T) {
 		}
 	}
 }
+
+func TestTidyRangesKeptWithContent(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	uid := newUser(t, s, "alice")
+	d, err := s.CreateDocument(ctx, uid, "笔记", "mint")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.GetDocument(ctx, uid, d.ID); len(got.TidyRanges) != 0 {
+		t.Fatalf("new document has ranges %v", got.TidyRanges)
+	}
+
+	// Offsets count UTF-16 units: "😀" is two, "说话" two.
+	content := "😀说话 hello"
+	ranges := []Range{{0, 2}, {2, 4}, {5, 10}}
+	if _, err := s.UpdateDocument(ctx, uid, d.ID, DocumentPatch{Content: &content, TidyRanges: &ranges}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetDocument(ctx, uid, d.ID)
+	if err != nil || !slices.Equal(got.TidyRanges, ranges) {
+		t.Fatalf("ranges = %v, err = %v", got.TidyRanges, err)
+	}
+
+	// Ranges alone may change without moving the document up.
+	empty := []Range{}
+	before := got.UpdatedAt
+	time.Sleep(2 * time.Millisecond)
+	if u, err := s.UpdateDocument(ctx, uid, d.ID, DocumentPatch{TidyRanges: &empty}); err != nil || !u.UpdatedAt.Equal(before) {
+		t.Fatalf("update = %+v, err = %v", u, err)
+	}
+	if got, _ := s.GetDocument(ctx, uid, d.ID); len(got.TidyRanges) != 0 {
+		t.Fatalf("ranges = %v", got.TidyRanges)
+	}
+
+	for _, bad := range [][]Range{{{3, 3}}, {{-1, 2}}, {{4, 6}, {2, 3}}, {{0, 3}, {2, 4}}, {{0, 11}}} {
+		if _, err := s.UpdateDocument(ctx, uid, d.ID, DocumentPatch{Content: &content, TidyRanges: &bad}); !errors.Is(err, ErrInvalid) {
+			t.Errorf("ranges %v: err = %v, want ErrInvalid", bad, err)
+		}
+	}
+}

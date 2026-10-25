@@ -66,6 +66,11 @@ var migrations = []migration{
 	);
 	CREATE INDEX images_created ON images (created_at);
 	`),
+	execSQL(`
+	-- Dictated text not yet tidied, as a JSON array of [from, to] offsets
+	-- into content. Clients keep it in step with content.
+	ALTER TABLE documents ADD COLUMN tidy_ranges TEXT NOT NULL DEFAULT '[]';
+	`),
 }
 
 func migrate(db *sql.DB) error {

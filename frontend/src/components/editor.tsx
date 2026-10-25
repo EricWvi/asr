@@ -10,7 +10,9 @@ import { imageUpload } from "@/editor/images";
 import { dedentListItem, exitEmptyListItem, indentListItem } from "@/editor/lists";
 import { livePreview } from "@/editor/live-preview";
 import { highlightTag, markdownSupport } from "@/editor/syntax";
+import { initialTidyRanges, type Span, spansOf, tidyRanges } from "@/editor/tidy";
 import { registerEditor } from "@/lib/editor-focus";
+import { setPending } from "@/voice/tidy";
 
 /*
  * Markdown source with live preview: the cursor's lines show their marks,
@@ -51,11 +53,14 @@ const markdownStyle = HighlightStyle.define([
 export function Editor({
   docId,
   initial,
+  initialSpans,
   onChange,
 }: {
   docId: number;
   initial: string;
-  onChange: (content: string) => void;
+  /** Dictated text awaiting tidying (editor/tidy.ts). */
+  initialSpans?: Span[];
+  onChange: (content: string, spans: Span[]) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const changed = useRef(onChange);
@@ -63,6 +68,7 @@ export function Editor({
 
   // The editor owns its text after mount; remount it (key) for another document.
   useEffect(() => {
+    let saved = "";
     const view = new EditorView({
       parent: host.current!,
       state: EditorState.create({
@@ -76,6 +82,8 @@ export function Editor({
           livePreview,
           imageUpload,
           dictation,
+          tidyRanges,
+          initialTidyRanges(initialSpans, initial.length),
           // Ahead of the Markdown keymap, which has high precedence.
           Prec.highest(
             keymap.of([
@@ -90,13 +98,23 @@ export function Editor({
           ]),
           theme,
           EditorView.updateListener.of((u) => {
-            if (u.docChanged) changed.current(u.state.doc.toString());
+            // The marks save with the text; showing them changes nothing.
+            const spans = spansOf(u.state);
+            const key = JSON.stringify(spans);
+            if (u.docChanged || key !== saved) {
+              saved = key;
+              changed.current(u.state.doc.toString(), spans);
+            }
+            setPending(spans.length > 0);
           }),
         ],
       }),
     });
+    saved = JSON.stringify(spansOf(view.state));
+    setPending(saved !== "[]");
     registerEditor(view, docId);
     return () => {
+      setPending(false);
       registerEditor(null);
       view.destroy();
     };

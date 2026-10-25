@@ -377,6 +377,21 @@ svg { display: block; }
 .cm .ln.blank .caret { vertical-align: -0.35em; }
 .cm .fresh { text-decoration: underline 2px var(--tint-deep); text-underline-offset: 5px; text-decoration-skip-ink: none; }
 .cm .fresh.fading { animation: fresh-fade 1.2s ease 2.5s forwards; }
+/* 待整理的文字：平时不显示；悬停「整理」时用文稿深色虚线标出来（.peek），告诉用户会改动哪些字 */
+.peek .cm .pending { text-decoration: underline 2px dotted var(--tint-deep); text-underline-offset: 5px; text-decoration-skip-ink: none; }
+/* 落选变体：淡色底（#tidy-peek-fill） */
+.peek.peek-fill .cm .pending { text-decoration: none; background: color-mix(in oklch, var(--tint-mark) 60%, transparent); border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+/* 整理中：待整理的文字上扫过一道文稿深色的微光；fixed 让分成多段的文字共用同一道光 */
+.tidying .cm .pending {
+  color: transparent; -webkit-background-clip: text; background-clip: text;
+  background-image: linear-gradient(100deg, var(--ink-3) 0 38%, var(--tint-deep) 50%, var(--ink-3) 62% 100%);
+  background-size: 800px 100%; background-attachment: fixed;
+  animation: shimmer 1.6s linear infinite;
+}
+@keyframes shimmer { from { background-position: 800px 0; } to { background-position: 0 0; } }
+/* 落选变体：文字整体呼吸（#tidying-pulse） */
+.tidying.tidy-pulse .cm .pending { color: var(--ink); background: none; animation: tidy-pulse 1.4s ease-in-out infinite; }
+@keyframes tidy-pulse { 50% { color: var(--ink-3); } }
 /* 说话时的中间结果：淡色显示在插入点，不写进正文；松手拿到全部定稿后一次写入 */
 .cm .interim { color: var(--ink-3); }
 
@@ -395,7 +410,17 @@ svg { display: block; }
   font-size: 13px; color: var(--ink-2);
   transition: background .15s, color .15s;
 }
+/* 两侧按钮同宽，「整理」变成「整理中」时说话按钮不跳动 */
+.dock-side { min-width: 96px; justify-content: center; }
 .dock-side:hover { background: var(--hover); color: var(--ink); }
+.dock-side:disabled { pointer-events: none; opacity: .45; }
+.tidy-wrap:has(:disabled) { cursor: help; }
+.dock-side .spinner { display: none; width: 14px; height: 14px; margin: 1px; border-radius: 50%; border: 1.75px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+.tidying .dock-side .spinner { display: inline-block; }
+.tidying .dock-side .sparkle { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* 整理中不能说话 */
+.tidying .hold { opacity: .45; pointer-events: none; box-shadow: none; }
 .hold {
   height: 50px; min-width: 220px; padding: 0 24px; border-radius: 999px;
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
@@ -582,6 +607,7 @@ kbd {
           <div class="ln li"><span class="mk lm">-</span><span class="rd lm">•</span>中午在西溪附近找家本帮菜，<strong><span class="mk">**</span>不要网红店<span class="mk">**</span></strong></div>
           <div class="ln li l2"><span class="mk lm">-</span><span class="rd lm">◦</span>楼外楼排队太久，备选知味观</div>
           <div class="ln li"><span class="mk lm">-</span><span class="rd lm">•</span>晚上住在湖滨，第二天早起绕湖骑一圈</div>
+          <div class="ln li"><span class="mk lm">-</span><span class="rd lm">•</span><span class="pending" data-tidied="第二天中午前退房，之后去河坊街逛逛">第二天中午之前要退房，那个退房之后呢再去河坊街逛一下</span></div>
           <div class="ln blank"></div>
           <div class="ln h3"><span class="mk hang">###</span>要带的东西</div>
           <div class="ln blank"></div>
@@ -614,7 +640,7 @@ kbd {
           <div class="ln blank"></div>
           <div class="ln img" data-at="img"><span class="mk">![西溪湿地](/api/images/k3f9a2)</span><img alt="西溪湿地" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 300' width='480' height='225'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23cfe6f3'/%3E%3Cstop offset='1' stop-color='%23f6ead0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='640' height='300' fill='url(%23s)'/%3E%3Ccircle cx='500' cy='90' r='34' fill='%23fbe69b'/%3E%3Cpath d='M0 210 Q160 150 320 200 T640 180 V300 H0z' fill='%23a9cfa4'/%3E%3Cpath d='M0 240 Q200 200 400 240 T640 230 V300 H0z' fill='%2389b88a'/%3E%3C/svg%3E"></div>
           <div class="ln blank"></div>
-          <div class="ln cur" id="fresh-line"><span class="fresh" id="fresh">还有一个想法是转写结果直接走 DeepSeek 整理一遍，把口语里的嗯啊去掉，再按段落分好</span></div>
+          <div class="ln cur" id="fresh-line"><span class="pending" data-tidied="还有一个想法：把转写结果直接交给 DeepSeek 整理一遍，去掉口语里的语气词，再按段落分好。整理好的文字原地替换，不满意可以撤销。"><span class="pending-part">还有一个想法是转写结果直接走 DeepSeek 整理一遍，把口语里的这些语气词去掉，然后再按段落分好。</span><span class="fresh" id="fresh">就是说整理好的直接替换掉原来的，不满意的话可以撤销</span></span></div>
         </div>
 
         <!-- 落选变体：所有行都显示标记符号（pc.html#source） -->
@@ -647,7 +673,8 @@ kbd {
     </div>
 
     <div class="dock" id="dock" hidden>
-      <button class="dock-side"><svg class="icon"><use href="#i-sparkle"/></svg>整理</button>
+      <!-- 没有待整理的文字时禁用，外层悬停说明原因（#tidy-empty） -->
+      <span class="tidy-wrap" id="tidyWrap"><button class="dock-side" id="tidyBtn"><svg class="icon sparkle"><use href="#i-sparkle"/></svg><span class="spinner" aria-hidden="true"></span><span id="tidyText">整理</span></button></span>
       <button class="hold" id="hold">
         <svg class="icon mic"><use href="#i-mic"/></svg>
         <span class="wave"><i></i><i></i><i></i><i></i><i></i></span>
@@ -846,8 +873,45 @@ cm.addEventListener('click', (e) => {
 });
 moveCursor($('fresh-line'));
 
+// 整理：悬停按钮标出待整理文字；点击后进入整理中，约 3 秒后原地替换，替换后的文字带转写同款下划线并淡掉
+const tidyBtn = $('tidyBtn');
+let tidyTimer;
+const pendings = () => [...cm.querySelectorAll('.pending')];
+const syncTidy = () => {
+  const has = pendings().length > 0;
+  tidyBtn.disabled = !has;
+  $('tidyWrap').title = has ? '' : '没有待整理的文字';
+};
+const tidyDone = () => {
+  root.classList.remove('tidying');
+  $('tidyText').textContent = '整理';
+  tidyBtn.title = '';
+  pendings().forEach((p) => {
+    const f = document.createElement('span'); f.className = 'fresh'; f.textContent = p.dataset.tidied;
+    p.replaceWith(f); void f.offsetWidth; f.classList.add('fading');
+  });
+  syncTidy();
+};
+const startTidy = () => {
+  root.classList.remove('peek');
+  cm.querySelectorAll('.fresh').forEach((f) => f.classList.remove('fresh', 'fading'));
+  root.classList.add('tidying');
+  $('tidyText').textContent = '整理中';
+  tidyBtn.title = '点击取消（Esc）';
+};
+tidyBtn.onmouseenter = () => { if (!root.classList.contains('tidying')) root.classList.add('peek'); };
+tidyBtn.onmouseleave = () => root.classList.remove('peek');
+tidyBtn.onclick = () => {
+  clearTimeout(tidyTimer);
+  if (root.classList.contains('tidying')) { root.classList.remove('tidying'); $('tidyText').textContent = '整理'; tidyBtn.title = ''; return; }
+  startTidy(); tidyTimer = setTimeout(tidyDone, 3000);
+};
+syncTidy();
+
 // 直接打开某个状态：pc.html#voice、#rec、#dark、#colors、#scrolled、#menu、#rename、#toast、#select、#only-sky、#listdown、#rose 等颜色名、
 // #countdown（录音最后 30 秒）、#asr-error、#mic-denied、#no-mic（语音模式的提示），
+// #tidy-peek（悬停整理）、#tidy-peek-fill（落选：淡色底）、#tidying（整理中）、#tidying-pulse（落选：呼吸）、#tidied（整理完成）、
+// #tidy-empty（没有待整理的文字）、#tidy-error（整理失败），
 // #source（落选变体）、#at-mark/li/task/quote/hr/code/table/img（光标所在行），可组合
 const hash = location.hash;
 if (hash.includes('source')) { cm.hidden = true; $('source-variant').hidden = false; }
@@ -863,6 +927,14 @@ const voiceToasts = {
   'mic-denied': '没有麦克风权限，请在浏览器的网站设置里允许',
   'no-mic': '没有找到麦克风',
 };
+if (/tidy|tidying|tidied/.test(hash)) setInput(true);
+if (hash.includes('tidy-peek')) root.classList.add('peek');
+if (hash.includes('peek-fill')) root.classList.add('peek-fill');
+if (hash.includes('tidying')) startTidy();
+if (hash.includes('tidying-pulse')) root.classList.add('tidy-pulse');
+if (hash.includes('tidied')) { startTidy(); tidyDone(); }
+if (hash.includes('tidy-empty')) { pendings().forEach((p) => p.replaceWith(...p.childNodes)); syncTidy(); }
+voiceToasts['tidy-error'] = '整理失败，请稍后再试';
 const vt = Object.keys(voiceToasts).find((k) => hash.includes(k));
 if (vt) { setInput(true); $('toastText').textContent = voiceToasts[vt]; $('undoBtn').hidden = true; $('toast').hidden = false; }
 if (hash.includes('colors')) $('palette').hidden = false;

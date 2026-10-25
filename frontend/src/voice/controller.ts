@@ -7,6 +7,7 @@ import { notify } from "@/lib/toast";
 import { useWorkspace } from "@/lib/workspace";
 import { type AsrOutcome, AsrSocket } from "@/voice/asr-socket";
 import { Recorder } from "@/voice/recorder";
+import { useTidy } from "@/voice/tidy";
 
 /*
  * Push to talk. Pressing opens the microphone at once and buffers the
@@ -44,7 +45,8 @@ let run: Run | null = null;
 const setPhase = (phase: Phase) => useVoice.setState({ phase, left: null });
 
 export function press(by: By) {
-  if (run) return;
+  // No talking while a tidy is running.
+  if (run || useTidy.getState().busy) return;
   const view = currentEditor();
   if (!view) return;
   const r: Run = { by, view, pressedAt: Date.now(), recorder: null!, socket: null, buffer: [], timers: [] };

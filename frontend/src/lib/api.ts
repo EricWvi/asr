@@ -16,9 +16,13 @@ export type DocSummary = {
   updated_at: string;
 };
 
-export type Doc = DocSummary & { content: string };
+/** [from, to) offsets into a document's content. */
+export type Span = [number, number];
 
-export type DocPatch = Partial<Pick<Doc, "title" | "color" | "content">>;
+/** tidy_ranges is the dictated text awaiting tidying. */
+export type Doc = DocSummary & { content: string; tidy_ranges?: Span[] };
+
+export type DocPatch = Partial<Pick<Doc, "title" | "color" | "content" | "tidy_ranges">>;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -65,6 +69,54 @@ export const api = {
   deleteDocument: (id: number) => request<null>("DELETE", `/api/documents/${id}`),
   restoreDocument: (id: number) => request<null>("POST", `/api/documents/${id}/restore`),
 };
+
+export type TidyRequest = { text: string; headings: string[]; prefix: string; suffix: string };
+
+/**
+ * Asks the server to tidy a transcript and returns the written text once
+ * the model has finished; the server streams it as JSON lines.
+ */
+export async function tidyText(req: TidyRequest, signal: AbortSignal): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch("/api/tidy", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    if (signal.aborted) throw err;
+    throw new ApiError(0, navigator.onLine ? "无法连接服务器" : "当前处于离线状态");
+  }
+  if (!res.ok || !res.body) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new ApiError(res.status, data?.error ?? `请求失败（${res.status}）`);
+  }
+  const lines = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let out = "";
+  let rest = "";
+  try {
+    for (;;) {
+      const { value, done } = await lines.read();
+      if (done) break;
+      rest += value;
+      const parts = rest.split("\n");
+      rest = parts.pop() ?? "";
+      for (const line of parts) {
+        if (!line.trim()) continue;
+        const m = JSON.parse(line) as { type: string; text?: string; message?: string };
+        if (m.type === "delta") out += m.text ?? "";
+        else if (m.type === "error") throw new ApiError(502, m.message ?? "整理失败，请稍后再试");
+        else if (m.type === "done") return out;
+      }
+    }
+  } catch (err) {
+    if (signal.aborted || err instanceof ApiError) throw err;
+  }
+  throw new ApiError(0, "整理中断，请稍后再试");
+}
 
 /** Ends this browser's session on the server. */
 export async function logout() {

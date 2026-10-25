@@ -3,12 +3,15 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand/v2"
 	"regexp"
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -20,6 +23,7 @@ const (
 	MaxTitleLen   = 200     // runes
 	MaxContentLen = 1 << 20 // bytes
 	snippetLen    = 80      // runes
+	maxTidyRanges = 10000
 )
 
 // TrashRetention is how long a deleted document can still be restored
@@ -29,20 +33,28 @@ const TrashRetention = 30 * 24 * time.Hour
 // Document is a Markdown note. Content is omitted from listings, which
 // carry Snippet instead.
 type Document struct {
-	ID        int64     `json:"id"`
-	Title     string    `json:"title"`
-	Color     string    `json:"color"`
-	Content   string    `json:"content,omitempty"`
-	Snippet   string    `json:"snippet,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID      int64  `json:"id"`
+	Title   string `json:"title"`
+	Color   string `json:"color"`
+	Content string `json:"content,omitempty"`
+	Snippet string `json:"snippet,omitempty"`
+	// TidyRanges is the dictated text awaiting tidying; only GetDocument
+	// fills it in.
+	TidyRanges []Range   `json:"tidy_ranges,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
+
+// Range is a span [from, to) of a document's content, in UTF-16 code units
+// as the editor counts them.
+type Range [2]int
 
 // DocumentPatch changes some fields of a document; nil fields are kept.
 type DocumentPatch struct {
-	Title   *string `json:"title"`
-	Color   *string `json:"color"`
-	Content *string `json:"content"`
+	Title      *string  `json:"title"`
+	Color      *string  `json:"color"`
+	Content    *string  `json:"content"`
+	TidyRanges *[]Range `json:"tidy_ranges"`
 }
 
 // CreateDocument adds a document for the user. An empty title falls back
@@ -109,17 +121,24 @@ func (s *Store) ListDocuments(ctx context.Context, userID int64) ([]Document, er
 // GetDocument returns one of the user's documents with its content.
 func (s *Store) GetDocument(ctx context.Context, userID, id int64) (Document, error) {
 	var d Document
+	var ranges string
 	var created, updated int64
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, title, color, content, created_at, updated_at
+		SELECT id, title, color, content, tidy_ranges, created_at, updated_at
 		FROM documents
 		WHERE id = ? AND user_id = ? AND deleted_at IS NULL`, id, userID).
-		Scan(&d.ID, &d.Title, &d.Color, &d.Content, &created, &updated)
+		Scan(&d.ID, &d.Title, &d.Color, &d.Content, &ranges, &created, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return d, ErrNotFound
 	}
+	if err != nil {
+		return d, err
+	}
+	if err := json.Unmarshal([]byte(ranges), &d.TidyRanges); err != nil {
+		return d, fmt.Errorf("document %d: tidy_ranges: %w", id, err)
+	}
 	d.CreatedAt, d.UpdatedAt = time.UnixMilli(created), time.UnixMilli(updated)
-	return d, err
+	return d, nil
 }
 
 // UpdateDocument applies the patch and returns the document without its
@@ -147,6 +166,16 @@ func (s *Store) UpdateDocument(ctx context.Context, userID, id int64, p Document
 			return Document{}, invalid("正文太长")
 		}
 		sets, args, touch = append(sets, "content = ?"), append(args, *p.Content), true
+	}
+	if p.TidyRanges != nil {
+		if err := checkRanges(*p.TidyRanges, p.Content); err != nil {
+			return Document{}, err
+		}
+		raw, err := json.Marshal(*p.TidyRanges)
+		if err != nil {
+			return Document{}, err
+		}
+		sets, args = append(sets, "tidy_ranges = ?"), append(args, string(raw))
 	}
 	if touch {
 		sets, args = append(sets, "updated_at = ?"), append(args, time.Now().UnixMilli())
@@ -223,6 +252,26 @@ func checkTitle(title string) (string, error) {
 		return "", invalid("标题不能换行")
 	}
 	return title, nil
+}
+
+// checkRanges wants ranges non-empty, in order without overlap, and within the
+// content when the same patch carries it.
+func checkRanges(ranges []Range, content *string) error {
+	if len(ranges) > maxTidyRanges {
+		return invalid("待整理的区间太多")
+	}
+	end := -1
+	if content != nil {
+		end = len(utf16.Encode([]rune(*content)))
+	}
+	prev := 0
+	for _, r := range ranges {
+		if r[0] < prev || r[0] >= r[1] || (end >= 0 && r[1] > end) {
+			return invalid("待整理的区间不正确")
+		}
+		prev = r[1]
+	}
+	return nil
 }
 
 func checkColor(color string) error {

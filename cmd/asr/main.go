@@ -19,6 +19,7 @@ import (
 	"asr/internal/dashscope"
 	"asr/internal/server"
 	"asr/internal/store"
+	"asr/internal/tidy"
 )
 
 // Set at build time with -ldflags "-X main.version=... -X main.commit=...".
@@ -68,6 +69,11 @@ func run(configPath string) error {
 		opts.ASR = dashscope.New(cfg.DashScope.Host, cfg.DashScope.Model, cfg.DashScope.APIKey)
 	} else {
 		slog.Warn("dashscope host or api key is not set: speech recognition is off")
+	}
+	if cfg.Tidy.BaseURL != "" && cfg.Tidy.Model != "" && cfg.Tidy.APIKey != "" {
+		opts.Tidy = tidy.New(cfg.Tidy.BaseURL, cfg.Tidy.Model, cfg.Tidy.APIKey, cfg.Tidy.ExtraBody)
+	} else {
+		slog.Warn("tidy base_url, model or api key is not set: tidying is off")
 	}
 	handler, err := server.New(st, authn, asr.Frontend(), opts)
 	if err != nil {

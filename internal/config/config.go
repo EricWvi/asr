@@ -62,6 +62,10 @@ type Tidy struct {
 	BaseURL string `yaml:"base_url"`
 	Model   string `yaml:"model"`
 	APIKey  string `yaml:"api_key"`
+	// ExtraBody is merged into every request body as it is, for vendor
+	// parameters such as DeepSeek's thinking switch. The standard fields
+	// (model, messages, stream) win over it.
+	ExtraBody map[string]any `yaml:"extra_body"`
 }
 
 // Default returns the configuration used when no file is present.

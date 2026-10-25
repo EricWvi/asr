@@ -205,6 +205,17 @@ func TestDocumentsAPI(t *testing.T) {
 		t.Errorf("bad color: status = %d", rec.Code)
 	}
 
+	// Ranges awaiting tidying travel with the content.
+	if rec := do(t, h, "PATCH", path, `{"content":"# 标题\n正文说话","tidy_ranges":[[7,9]]}`); rec.Code != http.StatusOK {
+		t.Fatalf("patch ranges: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, h, "GET", path, ""); !strings.Contains(rec.Body.String(), `"tidy_ranges":[[7,9]]`) {
+		t.Fatalf("get ranges: body = %s", rec.Body)
+	}
+	if rec := do(t, h, "PATCH", path, `{"content":"短","tidy_ranges":[[7,9]]}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("ranges past the end: status = %d", rec.Code)
+	}
+
 	// Another user cannot see or touch it.
 	alice := h.session
 	h.session = h.signIn(t, "bob")

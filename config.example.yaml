@@ -29,6 +29,12 @@ tidy:
   model: "deepseek-flash"
   # Prefer the ASR_TIDY_API_KEY environment variable.
   api_key: ""
+  # Vendor parameters merged into the request body as they are; model,
+  # messages and stream are set by the server. deepseek-flash thinks by
+  # default, which tidies better, so nothing is needed here.
+  # extra_body:
+  #   thinking:
+  #     type: enabled
 
 # Local development only: skip OIDC and sign every request in as this user.
 # dev_user: "eric"

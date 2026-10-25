@@ -1,12 +1,15 @@
 import { type Extension, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 
+import { markDictated } from "@/editor/tidy";
+
 /*
  * Dictation in the editor. While the user speaks, what has been heard so
  * far shows faintly at the insertion point without entering the text. On
  * release the final text replaces the selection the dictation started with,
  * as one undoable change, and gets an underline in the document's deep tint
- * that fades after a few seconds.
+ * that fades after a few seconds. The text is marked for tidying
+ * (editor/tidy.ts).
  */
 
 type Pending = { from: number; to: number; text: string };
@@ -97,6 +100,21 @@ const fresh = StateField.define<DecorationSet>({
 
 let freshSeq = 0;
 
+/**
+ * Effects that underline the spans (positions after the change they go
+ * with); the underline fades on its own.
+ */
+export function markFresh(view: EditorView, spans: readonly (readonly [number, number])[]): StateEffect<unknown>[] {
+  const id = ++freshSeq;
+  // The editor may be gone by then (another document opened).
+  const later = (effect: StateEffect<number>) => () => {
+    if (view.dom.isConnected) view.dispatch({ effects: effect });
+  };
+  setTimeout(later(fadeFresh.of(id)), FRESH_MS);
+  setTimeout(later(dropFresh.of(id)), FRESH_MS + FADE_MS);
+  return spans.filter(([from, to]) => from < to).map(([from, to]) => addFresh.of({ id, from, to }));
+}
+
 /** Marks the selection as the insertion point and starts showing interim text. */
 export function beginDictation(view: EditorView) {
   view.dispatch({ effects: begin.of(null) });
@@ -115,21 +133,14 @@ export function commitDictation(view: EditorView, text: string) {
     view.dispatch({ effects: end.of(null) });
     return;
   }
-  const id = ++freshSeq;
   const to = p.from + text.length;
   view.dispatch({
     changes: { from: p.from, to: p.to, insert: text },
     selection: { anchor: to },
-    effects: [end.of(null), addFresh.of({ id, from: p.from, to })],
+    effects: [end.of(null), markDictated(p.from, to), ...markFresh(view, [[p.from, to]])],
     userEvent: "input.dictation",
     scrollIntoView: true,
   });
-  // The editor may be gone by then (another document opened).
-  const later = (effect: StateEffect<number>) => () => {
-    if (view.dom.isConnected) view.dispatch({ effects: effect });
-  };
-  setTimeout(later(fadeFresh.of(id)), FRESH_MS);
-  setTimeout(later(dropFresh.of(id)), FRESH_MS + FADE_MS);
 }
 
 /** Drops the dictation without touching the text. */

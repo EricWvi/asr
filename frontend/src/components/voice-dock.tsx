@@ -1,39 +1,39 @@
 import { insertNewlineContinueMarkup } from "@codemirror/lang-markdown";
 import { insertNewlineAndIndent } from "@codemirror/commands";
-import { CornerDownLeftIcon, MicIcon, SparklesIcon } from "lucide-react";
+import { CornerDownLeftIcon, LoaderCircleIcon, MicIcon, SparklesIcon } from "lucide-react";
 import { useEffect } from "react";
 
 import { exitEmptyListItem } from "@/editor/lists";
+import { showUntidied } from "@/editor/tidy";
 import { currentEditor } from "@/lib/editor-focus";
 import { cn } from "@/lib/utils";
 import { abort, press, release, useVoice } from "@/voice/controller";
+import { cancelTidy, tidy, useTidy } from "@/voice/tidy";
 
+// Both side buttons are as wide as 「整理中」, so the middle one stays put.
 const side =
-  "inline-flex h-[46px] items-center gap-2 rounded-full px-4 text-[13px] text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-45";
+  "inline-flex h-[46px] min-w-[96px] items-center justify-center gap-2 rounded-full px-4 text-[13px] text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-45";
 
 /** The floating bar of voice mode: tidy | hold to talk | new line. */
 export function VoiceDock() {
   const phase = useVoice((s) => s.phase);
   const left = useVoice((s) => s.left);
   const recording = phase === "recording";
+  const busy = useTidy((s) => s.busy);
   usePushToTalkKey();
 
   return (
     <div className="absolute bottom-9 left-1/2 z-5 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-surface/88 p-1.5 shadow-[inset_0_0_0_1px_var(--line),var(--shadow-lg)] backdrop-blur-[16px]">
-      {/* Disabled until there is something to tidy (stage 5); the wrapper shows why. */}
-      <span className="cursor-help" title="没有待整理的文字">
-        <button className={side} disabled tabIndex={-1}>
-          <SparklesIcon className="size-4" strokeWidth={1.75} />
-          整理
-        </button>
-      </span>
+      <TidyButton />
       <button
         className={cn(
           "inline-flex h-[50px] min-w-[220px] items-center justify-center gap-2.5 rounded-full bg-blue px-6 text-[14.5px] font-semibold text-white shadow-[0_6px_16px_-6px_color-mix(in_oklch,var(--blue)_70%,transparent)] transition-[transform,background-color,box-shadow] duration-200 select-none active:scale-[.98] active:bg-rec",
           recording && "scale-[.98] bg-rec shadow-[0_0_0_6px_color-mix(in_oklch,var(--rec)_18%,transparent)]",
+          // No talking while tidying.
+          busy && "opacity-45 shadow-none",
         )}
         aria-pressed={recording}
-        disabled={phase === "finishing"}
+        disabled={phase === "finishing" || busy}
         // Keep the editor focused, with its cursor where the text will go.
         onMouseDown={(e) => e.preventDefault()}
         onContextMenu={(e) => e.preventDefault()}
@@ -64,6 +64,40 @@ export function VoiceDock() {
         换行
       </button>
     </div>
+  );
+}
+
+/** Tidies the untidied dictation; hovering shows which text, clicking again cancels. */
+function TidyButton() {
+  const pending = useTidy((s) => s.pending);
+  const busy = useTidy((s) => s.busy);
+  const idle = useVoice((s) => s.phase === "idle");
+  const peek = (on: boolean) => {
+    const view = currentEditor();
+    if (view && !useTidy.getState().busy) showUntidied(view, on ? "peek" : "none");
+  };
+  const enabled = busy || (pending && idle);
+  const why = enabled || pending ? undefined : "没有待整理的文字";
+  return (
+    // A disabled button gets no pointer events; the wrapper says why.
+    <span className={cn(why && "cursor-help")} title={why}>
+      <button
+        className={side}
+        disabled={!enabled}
+        title={busy ? "点击取消（Esc）" : undefined}
+        onMouseDown={(e) => e.preventDefault()}
+        onMouseEnter={() => peek(true)}
+        onMouseLeave={() => peek(false)}
+        onClick={() => (busy ? cancelTidy() : void tidy())}
+      >
+        {busy ? (
+          <LoaderCircleIcon className="size-4 animate-spin" strokeWidth={1.75} />
+        ) : (
+          <SparklesIcon className="size-4" strokeWidth={1.75} />
+        )}
+        {busy ? "整理中" : "整理"}
+      </button>
+    </span>
   );
 }
 
@@ -99,7 +133,13 @@ function usePushToTalkKey() {
   useEffect(() => {
     const isSpace = (e: KeyboardEvent) => e.key === " " && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
     const down = (e: KeyboardEvent) => {
-      if (!isSpace(e) || e.isComposing || typingElsewhere(e.target)) return;
+      if (e.key === "Escape" && useTidy.getState().busy && !typingElsewhere(e.target)) {
+        e.preventDefault();
+        cancelTidy();
+        return;
+      }
+      // While tidying the space bar types a space.
+      if (!isSpace(e) || e.isComposing || typingElsewhere(e.target) || useTidy.getState().busy) return;
       e.preventDefault();
       if (!e.repeat) press("key");
     };

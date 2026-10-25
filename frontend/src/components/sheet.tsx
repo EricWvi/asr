@@ -72,7 +72,15 @@ function Body({ id }: { id: number }) {
       </p>
     );
   if (!data) return null;
-  return <Editor key={id} docId={id} initial={data.content} onChange={(content) => edit(id, { content })} />;
+  return (
+    <Editor
+      key={id}
+      docId={id}
+      initial={data.content}
+      initialSpans={data.tidy_ranges}
+      onChange={(content, spans) => edit(id, { content, tidy_ranges: spans })}
+    />
+  );
 }
 
 const modes: { mode: InputMode; label: string; Icon: typeof MicIcon }[] = [
