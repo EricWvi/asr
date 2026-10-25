@@ -1,5 +1,6 @@
-import { FilePlusIcon, MicIcon } from "lucide-react";
+import { FilePlusIcon } from "lucide-react";
 
+import logo from "@/assets/logo.svg";
 import { DocList } from "@/components/doc-list";
 import { SearchBox } from "@/components/search-box";
 import { UserMenu } from "@/components/user-menu";
@@ -13,8 +14,8 @@ export function Sidebar({ user }: { user: User }) {
   return (
     <aside className="flex min-h-0 flex-col pt-2 pr-3 pl-4 max-md:hidden max-md:px-3 max-md:pt-[max(12px,env(safe-area-inset-top))] max-md:pb-[env(safe-area-inset-bottom)] max-md:list-open:flex">
       <div className="flex items-center gap-2.5 px-1.5 pt-0.5 pb-[18px]">
-        <div className="grid size-[30px] place-items-center rounded-[9px] bg-surface text-blue shadow-sm">
-          <MicIcon className="size-4" strokeWidth={1.75} />
+        <div className="grid size-[30px] place-items-center rounded-[9px] bg-surface shadow-sm">
+          <img src={logo} alt="" className="w-[21px]" />
         </div>
         <div className="font-serif text-base leading-none font-semibold tracking-[.06em]">听写</div>
       </div>
