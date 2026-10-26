@@ -45,7 +45,7 @@ const markdownStyle = HighlightStyle.define([
   { tag: highlightTag, class: "cm-md-mark" },
   { tag: tags.link, color: "var(--blue)" },
   { tag: tags.url, class: "cm-md-url" },
-  { tag: tags.monospace, fontFamily: '"SF Mono", ui-monospace, Menlo, monospace' },
+  { tag: tags.monospace, fontFamily: "var(--font-mono)" },
   { tag: tags.quote, color: "var(--ink-2)" },
   // #, -, >, **, ` and other syntax marks take the document's deep tint (.cm-md-pi).
   { tag: tags.processingInstruction, class: "cm-md-pi" },

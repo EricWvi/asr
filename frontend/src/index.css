@@ -13,6 +13,13 @@
 :root {
   color-scheme: light dark;
 
+  /*
+   * No mono face carries CJK glyphs, and the generic monospace family falls
+   * back to SimSun on Chinese Windows, so name Windows' mono and the sans CJK
+   * faces before it.
+   */
+  --font-mono: "SF Mono", ui-monospace, Menlo, "Cascadia Mono", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", monospace;
+
   --bg: #faf8f5;
   --surface: #ffffff;
   --ink: #1d1d1f;
@@ -340,7 +347,7 @@
 .cm-editor .cm-line.cm-md-code {
   position: relative;
   padding: 0 16px;
-  font: 13.5px/1.75 "SF Mono", ui-monospace, Menlo, monospace;
+  font: 13.5px/1.75 var(--font-mono);
   background: rgb(0 0 0 / 0.04);
 }
 .cm-editor .cm-line.cm-md-code-first {
@@ -436,7 +443,7 @@
   border-top: 1px solid var(--line);
 }
 .cm-editor .cm-line.cm-md-table {
-  font: 14px/1.85 "SF Mono", ui-monospace, Menlo, monospace;
+  font: 14px/1.85 var(--font-mono);
 }
 
 /* Rendered tables, away from the cursor. */
@@ -481,7 +488,7 @@
 }
 .cm-md-math-src,
 .cm-editor .cm-line.cm-md-math-src {
-  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
 }
 
@@ -507,7 +514,7 @@
 /* KaTeX or Mermaid still loading: the source, dimmed. */
 .cm-md-loading {
   white-space: pre-wrap;
-  font: 13px/1.6 "SF Mono", ui-monospace, Menlo, monospace;
+  font: 13px/1.6 var(--font-mono);
   color: var(--ink-3);
   text-align: left;
 }
