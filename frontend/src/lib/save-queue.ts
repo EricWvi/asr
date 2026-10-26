@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { api, ApiError, type Doc, type DocPatch, type DocSummary } from "@/lib/api";
+import { api, ApiError, writing, type Doc, type DocPatch, type DocSummary } from "@/lib/api";
 import { queryClient } from "@/lib/query";
 
 /*
@@ -110,4 +110,9 @@ addEventListener("visibilitychange", () => {
 });
 addEventListener("pagehide", () => {
   for (const id of pending.keys()) void flush(id, true);
+});
+
+// Ask before leaving while edits or other writes have not reached the server.
+addEventListener("beforeunload", (e) => {
+  if (pending.size || inflight.size || writing()) e.preventDefault();
 });

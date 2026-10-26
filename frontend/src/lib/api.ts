@@ -46,7 +46,23 @@ export class ApiError extends Error {
   }
 }
 
+let writes = 0;
+
+/** Whether a request that changes server data has not finished yet. */
+export const writing = () => writes > 0;
+
 async function request<T>(method: string, path: string, body?: unknown, keepalive = false): Promise<T> {
+  // A keepalive request outlives the page, so it is no reason to stay.
+  const counted = method !== "GET" && !keepalive;
+  if (counted) writes++;
+  try {
+    return await send<T>(method, path, body, keepalive);
+  } finally {
+    if (counted) writes--;
+  }
+}
+
+async function send<T>(method: string, path: string, body: unknown, keepalive: boolean): Promise<T> {
   const init: RequestInit = { method, cache: "no-store", keepalive };
   if (body instanceof Blob) {
     init.body = body;

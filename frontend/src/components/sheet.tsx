@@ -1,3 +1,5 @@
+import NumberFlow from "@number-flow/react";
+import { countWords } from "alfaaz";
 import { ChevronLeftIcon, KeyboardIcon, MicIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -208,13 +210,25 @@ function ColorPicker({ doc }: { doc: DocSummary }) {
   );
 }
 
-/** Characters other than whitespace, counted in code points. */
+/**
+ * Words as alfaaz counts them, each CJK character being one. The count
+ * follows what is saved, so it stays still while typing, and its digits
+ * roll when it changes.
+ */
 function WordCount({ id }: { id: number }) {
   const { data } = useDocument(id);
-  if (!data) return null;
-  let n = 0;
-  for (const ch of data.content) if (!/\s/.test(ch)) n++;
-  return <span className={chip}>{n} 字</span>;
+  const saved = useSaveStatus((s) => !s.status[id]);
+  const [shown, setShown] = useState<{ id: number; content: string }>();
+  if (data && (shown?.id !== id || (saved && shown.content !== data.content))) {
+    setShown({ id, content: data.content });
+  }
+  if (!shown || shown.id !== id) return null;
+  return (
+    <span className={chip}>
+      {/* Keyed so another document's count shows at once instead of rolling. */}
+      <NumberFlow key={id} value={countWords(shown.content)} suffix=" 字" />
+    </span>
+  );
 }
 
 function SaveState({ id }: { id: number }) {
