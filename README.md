@@ -28,6 +28,17 @@ ASR_TIDY_API_KEY=...
 
 `task run:server -- -config other.yaml` 可以把参数透传给 `asr`。Service Worker 只在生产构建中注册。
 
+### 安卓客户端
+
+Jetpack Compose 工程在 [android/](android/)，用 Android Studio 打开即可。命令行构建要用 Android Studio 自带的 JBR：
+
+```sh
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+cd android && ./gradlew installDebug   # 装到已连接的手机或模拟器
+```
+
+debug 包允许明文 HTTP：登录页点服务器地址，改成 `http://<电脑的局域网 IP>:36750` 就能连本地开发服务（模拟器里用 `http://10.0.2.2:36750`）。
+
 ## 测试
 
 ```sh

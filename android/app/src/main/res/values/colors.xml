@@ -1,0 +1,5 @@
+<resources>
+    <!-- paper in design/android.html -->
+    <color name="paper">#FFFFFDF5</color>
+    <color name="ic_launcher_background">#FFFFFDF5</color>
+</resources>

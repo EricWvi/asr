@@ -1,0 +1,740 @@
+package top.onlyquant.tingxie.ui
+
+import android.content.ClipData
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import top.onlyquant.tingxie.AppModel
+import top.onlyquant.tingxie.Route
+import top.onlyquant.tingxie.data.ApiError
+import top.onlyquant.tingxie.data.Doc
+import top.onlyquant.tingxie.data.DocPatch
+import top.onlyquant.tingxie.data.SaveStatus
+import top.onlyquant.tingxie.data.countWords
+import top.onlyquant.tingxie.data.fitting
+import top.onlyquant.tingxie.data.mapped
+import top.onlyquant.tingxie.data.plus
+import top.onlyquant.tingxie.data.Change
+import top.onlyquant.tingxie.voice.DictationTarget
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.style.TextDecoration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import top.onlyquant.tingxie.data.shortTime
+import top.onlyquant.tingxie.data.userMessage
+import top.onlyquant.tingxie.ui.theme.TintNames
+import top.onlyquant.tingxie.ui.theme.Tokens
+import top.onlyquant.tingxie.ui.theme.tint
+
+@Composable
+fun DocScreen(m: AppModel, route: Route.Doc) {
+    val p = Tokens.palette
+    val id = route.id
+    val lib = m.library
+    val doc = lib.doc(id)
+    val scope = rememberCoroutineScope()
+    var failed by remember(id) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(id) {
+        try {
+            lib.fetch(id)
+        } catch (e: ApiError) {
+            if (e.status == 404) {
+                m.forgetLast(id)
+                m.toast("内容不存在或已被删除")
+                m.back()
+            } else if (lib.doc(id) == null) failed = e.userMessage()
+        } catch (e: Exception) {
+            if (lib.doc(id) == null) failed = e.userMessage()
+        }
+    }
+
+    // Leaving: a new document nobody wrote in is thrown away.
+    DisposableEffect(id) {
+        onDispose {
+            val d = lib.doc(id)
+            if (route.fresh && d != null && d.content.isBlank() && !lib.dirty(id)) {
+                scope.launch {
+                    runCatching { lib.delete(id) }
+                    m.forgetLast(id)
+                }
+            } else {
+                scope.launch { lib.flush(id) }
+            }
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(p.paper)) {
+        if (doc == null) {
+            Column(Modifier.statusBarsPadding()) {
+                DocBar(m, null, scrolled = false, onMore = {})
+                failed?.let {
+                    Box(Modifier.fillMaxWidth().padding(top = 120.dp), contentAlignment = Alignment.Center) {
+                        Text(it, color = p.ink3, fontSize = 14.sp)
+                    }
+                }
+            }
+            return@Box
+        }
+        DocBody(m, doc, route)
+    }
+}
+
+/** Where a tap on the rendered text landed: the block, and the point within it. */
+private data class Tap(val start: Int, val end: Int, val blockY: Float, val x: Float, val dy: Float)
+
+private data class Block(val start: Int, val end: Int, val y: Float)
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc: Doc, route: Route.Doc) {
+    val p = Tokens.palette
+    val t = p.tint(doc.color)
+    val lib = m.library
+    val scroll = rememberScrollState()
+    val density = LocalDensity.current
+    val scrolled = scroll.value > with(density) { 60.dp.toPx() }
+    var menu by remember { mutableStateOf(false) }
+    var palette by remember { mutableStateOf(false) }
+    val blocks = remember(doc.id) { mutableStateMapOf<Int, Block>() }
+    var bodyTop by remember { mutableStateOf(0f) }
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val talk = remember(doc.id) { DocDictation(m, doc.id, scope) }
+    DisposableEffect(talk) { onDispose { if (m.voice.busyWith(talk)) m.voice.abort() } }
+
+    // ---------- edit mode ----------
+    var editing by remember(doc.id) { mutableStateOf(false) }
+    var title by remember(doc.id) { mutableStateOf<TextFieldValue?>(null) }
+    var value by remember(doc.id) { mutableStateOf(TextFieldValue(doc.content, TextRange(doc.content.length))) }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var tap by remember { mutableStateOf<Tap?>(null) }
+    val bodyFocus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val hl = remember(p, t) { Highlight(p, t) }
+    if (!m.online && editing) {
+        editing = false
+        title = null
+    }
+    // Text written from elsewhere (dictation, a task box) reaches the editor.
+    if (doc.content != value.text) {
+        val c = doc.content
+        value = TextFieldValue(c, TextRange(value.selection.start.coerceIn(0, c.length), value.selection.end.coerceIn(0, c.length)))
+    }
+
+    fun commitTitle() {
+        val v = title ?: return
+        val tt = v.text.trim()
+        if (tt.isNotEmpty() && tt != doc.title) lib.edit(doc.id, DocPatch(title = tt))
+        title = null
+    }
+
+    fun finishEditing() {
+        commitTitle()
+        editing = false
+        focusManager.clearFocus()
+        scope.launch { lib.flush(doc.id) }
+    }
+
+    fun startEditing(at: Int?) {
+        if (!m.online) return
+        commitTitle()
+        editing = true
+        if (at != null) value = value.copy(selection = TextRange(at))
+    }
+
+    fun onEdit(next: TextFieldValue) {
+        var v = next
+        continueList(value.text, v.text, v.selection.start)?.let { (s, c) -> v = TextFieldValue(s, TextRange(c)) }
+        if (v.text != value.text) {
+            val ch = Change.between(value.text, v.text)!!
+            val cur = lib.doc(doc.id) ?: doc
+            val ranges = cur.tidyRanges.fitting(value.text).mapped(ch, manual = true)
+            talk.fresh = talk.fresh?.let { (a, b) -> ch.map(a, 1) to ch.map(b, -1) }?.takeIf { it.first < it.second }
+            lib.edit(doc.id, DocPatch(content = v.text, tidyRanges = ranges))
+        }
+        value = v
+    }
+
+    BackHandler(editing) { finishEditing() }
+
+    // Dictation goes to the cursor while editing, to the end otherwise.
+    talk.insertionPoint = if (editing && title == null) {
+        { value.selection.min }
+    } else {
+        { lib.doc(doc.id)?.content?.length ?: 0 }
+    }
+    talk.onWritten = { _, b -> if (editing) value = TextFieldValue(lib.doc(doc.id)?.content ?: "", TextRange(b)) }
+
+    // Entering edit mode from a tap: the cursor goes where the finger was,
+    // and the tapped block stays where it was on screen.
+    LaunchedEffect(tap) {
+        val tp = tap ?: return@LaunchedEffect
+        val l = androidx.compose.runtime.snapshotFlow { layout.takeIf { editing } }.first { it != null }!!
+        val len = l.layoutInput.text.length
+        val start = tp.start.coerceIn(0, len)
+        val top = l.getLineTop(l.getLineForOffset(start))
+        val off = l.getOffsetForPosition(Offset(tp.x, top + tp.dy)).coerceIn(start, tp.end.coerceIn(start, len))
+        value = value.copy(selection = TextRange(off))
+        val target = (scroll.value + top - tp.blockY).toInt()
+        scroll.scrollTo(target)
+        bodyFocus.requestFocus()
+        // Focusing scrolls the field on its own while the keyboard comes up;
+        // put the tapped block back where it was.
+        delay(450)
+        scroll.animateScrollTo(target)
+        // Last: clearing the key cancels this effect.
+        tap = null
+    }
+    LaunchedEffect(editing, title == null) {
+        if (editing && title == null && tap == null) bodyFocus.requestFocus()
+    }
+
+    // View mode dictates at the end: keep it in sight.
+    val interim = talk.interim
+    LaunchedEffect(interim != null, interim) {
+        if (interim != null && !editing) scroll.animateScrollTo(scroll.maxValue)
+    }
+    val dim = if (m.voice.cancelling) SpanStyle(color = p.ink3.copy(alpha = .55f), textDecoration = TextDecoration.LineThrough) else SpanStyle(color = p.ink3)
+    val at = talk.at.coerceIn(0, doc.content.length)
+    val shown = if (interim == null || editing) doc.content else doc.content.substring(0, at) + interim + doc.content.substring(at)
+    val overlays = buildList {
+        if (interim != null && interim.isNotEmpty()) add(Overlay(at, at + interim.length, dim))
+        talk.fresh?.let { (a, b) -> add(Overlay(a, b, tag = Backdrops.FRESH, item = t.deep.toArgb().toString())) }
+    }
+
+    // From a search result: scroll the first block with a hit into the middle.
+    if (route.hits.isNotEmpty()) {
+        LaunchedEffect(doc.id, blocks.size) {
+            val lower = doc.content.lowercase()
+            val first = route.hits.minOfOrNull { w -> lower.indexOf(w.lowercase()).let { if (it < 0) Int.MAX_VALUE else it } } ?: return@LaunchedEffect
+            val y = blocks.values.filter { it.start <= first }.maxByOrNull { it.start }?.y ?: return@LaunchedEffect
+            scroll.scrollTo((bodyTop + y - with(density) { 240.dp.toPx() }).toInt().coerceAtLeast(0))
+        }
+    }
+
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        DocBar(m, doc, scrolled, editing = editing, onMore = { menu = true }, onDone = { finishEditing() })
+        if (menu) {
+            Box(Modifier.fillMaxWidth()) {
+                PopMenu(onDismiss = { menu = false }, offsetY = (-8).dp) {
+                    MenuItem(Icons.Copy, "复制 Markdown") {
+                        menu = false
+                        scope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(doc.title, exportMarkdown(doc))))
+                            m.toast("已复制 Markdown")
+                        }
+                    }
+                    MenuItem(Icons.Share, "分享 .md 文件") {
+                        menu = false
+                        scope.launch { shareMarkdown(context, doc) }
+                    }
+                    Divider(Modifier.padding(horizontal = 6.dp, vertical = 6.dp))
+                    MenuItem(Icons.Trash, "删除", danger = true) {
+                        menu = false
+                        m.toList()
+                        m.deleteDoc(doc.id, doc.title)
+                    }
+                }
+            }
+        }
+        if (!m.online) OfflineBar()
+        Column(Modifier.weight(1f).verticalScroll(scroll)) {
+            Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp)) {
+                TitleField(doc, title, onChange = { title = it }, onStart = {
+                    if (m.online) {
+                        startEditing(null)
+                        title = TextFieldValue(doc.title, TextRange(doc.title.length))
+                    }
+                }, onEnter = {
+                    commitTitle()
+                    value = value.copy(selection = TextRange(0))
+                    bodyFocus.requestFocus()
+                })
+                Box(Modifier.padding(top = 12.dp)) {
+                    Meta(m, doc, onDot = { palette = true })
+                    if (palette) ColorPopup(doc.color, onPick = {
+                        palette = false
+                        if (it != doc.color) lib.edit(doc.id, DocPatch(color = it))
+                    }, onDismiss = { palette = false })
+                }
+                Box(Modifier.padding(top = 20.dp).fillMaxWidth().height(1.dp).background(p.paperLine))
+            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { bodyTop = it.positionInParent().y + with(density) { 22.dp.toPx() } }
+                    .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = if (editing) 40.dp else 200.dp),
+            ) {
+                if (editing) {
+                    Editor(
+                        value, ::onEdit, hl,
+                        interim = interim, at = at, interimStyle = dim,
+                        fresh = talk.fresh, freshAlpha = { talk.freshAlpha.value }, freshColor = t.deep,
+                        onLayout = { layout = it },
+                        modifier = Modifier.focusRequester(bodyFocus),
+                    )
+                } else {
+                    val tapper = Modifier.pointerInput(m.online) {
+                        detectTapGestures { o ->
+                            if (!m.online) return@detectTapGestures
+                            val b = blocks.values.filter { it.y <= o.y }.maxByOrNull { it.y }
+                            tap = if (b == null) null else Tap(b.start, b.end, b.y, o.x, o.y - b.y)
+                            startEditing(if (b == null) doc.content.length else null)
+                        }
+                    }
+                    if (shown.isBlank()) {
+                        Text("按住说话，或点这里输入", color = p.ink3, fontSize = 17.sp, lineHeight = 29.75.sp, modifier = Modifier.fillMaxWidth().then(tapper))
+                    } else {
+                        MarkdownView(
+                            shown, t, m.api!!.server, route.hits,
+                            onToggle = { off -> toggleTask(m, doc, off) },
+                            overlays = overlays,
+                            freshAlpha = { talk.freshAlpha.value },
+                            onBlock = { s, e, y -> blocks[s] = Block(s, e, y) },
+                            modifier = tapper,
+                        )
+                    }
+                }
+            }
+        }
+        if (editing && m.online) Tools(m, doc, talk, onHide = { finishEditing() })
+    }
+    if (m.online && !editing) {
+        Dock(m, doc, talk, onKeyboard = {
+            startEditing(doc.content.length)
+        }, Modifier.align(Alignment.BottomCenter))
+        CancelHint(m, talk, Modifier.align(Alignment.BottomCenter).padding(bottom = bottomGap() + 76.dp))
+    }
+    if (editing) {
+        CancelHint(m, talk, Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)).padding(bottom = 66.dp))
+    }
+    m.snack?.let { s ->
+        Snack(s, onDone = { if (m.snack?.id == s.id) m.snack = null },
+            Modifier.align(Alignment.BottomCenter).then(
+                if (editing) Modifier.windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)).padding(bottom = 66.dp)
+                else Modifier.padding(bottom = bottomGap() + 82.dp),
+            ))
+    }
+}
+
+/** The title: tap to rename in place; Enter jumps into the text; clearing it keeps the old one. */
+@Composable
+private fun TitleField(doc: Doc, value: TextFieldValue?, onChange: (TextFieldValue) -> Unit, onStart: () -> Unit, onEnter: () -> Unit) {
+    val p = Tokens.palette
+    val style = androidx.compose.ui.text.TextStyle(color = p.ink, fontSize = 26.sp, fontWeight = FontWeight.Bold, lineHeight = 34.sp, letterSpacing = (-0.26).sp)
+    if (value == null) {
+        Text(doc.title, style = style, modifier = Modifier.pointerInput(Unit) { detectTapGestures { onStart() } })
+        return
+    }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    BasicTextField(
+        value, { onChange(it.copy(text = it.text.replace("\n", ""))) },
+        textStyle = style,
+        cursorBrush = SolidColor(p.accent),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+        keyboardActions = KeyboardActions(onNext = { onEnter() }),
+        modifier = Modifier.fillMaxWidth().focusRequester(focus),
+    )
+}
+
+/** The source with syntax colours; code blocks and fresh text are drawn behind it. */
+@Composable
+private fun Editor(
+    value: TextFieldValue,
+    onChange: (TextFieldValue) -> Unit,
+    hl: Highlight,
+    interim: String?,
+    at: Int,
+    interimStyle: SpanStyle,
+    fresh: Pair<Int, Int>?,
+    freshAlpha: () -> Float,
+    freshColor: Color,
+    onLayout: (TextLayoutResult) -> Unit,
+    modifier: Modifier,
+) {
+    val p = Tokens.palette
+    var l by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val transform = remember(hl, interim, at, interimStyle) { SourceTransformation(hl, interim, at, interimStyle) }
+    val blocks = remember(value.text) { codeBlocks(value.text) }
+    val n = interim?.length ?: 0
+    fun tx(o: Int) = if (o <= at || n == 0) o else o + n
+    BasicTextField(
+        value, onChange,
+        textStyle = androidx.compose.ui.text.TextStyle(color = p.ink, fontSize = 17.sp, lineHeight = 29.75.sp),
+        cursorBrush = SolidColor(p.accent),
+        visualTransformation = transform,
+        onTextLayout = { l = it; onLayout(it) },
+        modifier = modifier
+            .fillMaxWidth()
+            .drawBehind {
+                val lay = l ?: return@drawBehind
+                val len = lay.layoutInput.text.length
+                val pad = 12.dp.toPx()
+                for (b in blocks) {
+                    val s = tx(b.first).coerceIn(0, len)
+                    val e = tx(b.last + 1).coerceIn(0, len)
+                    val top = lay.getLineTop(lay.getLineForOffset(s))
+                    val bottom = lay.getLineBottom(lay.getLineForOffset(e))
+                    drawRoundRect(p.codeBlock, Offset(-pad, top), androidx.compose.ui.geometry.Size(size.width + 2 * pad, bottom - top), androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()))
+                }
+                val f = fresh ?: return@drawBehind
+                val alpha = freshAlpha()
+                if (alpha <= 0f) return@drawBehind
+                val fs = tx(f.first).coerceIn(0, len)
+                val fe = tx(f.second).coerceIn(0, len)
+                if (fs >= fe) return@drawBehind
+                val first = lay.getLineForOffset(fs)
+                val last = lay.getLineForOffset(fe - 1)
+                for (line in first..last) {
+                    val left = if (line == first) lay.getHorizontalPosition(fs, true) else lay.getLineLeft(line)
+                    val right = if (line == last) lay.getHorizontalPosition(fe, true) else lay.getLineRight(line)
+                    val y = lay.getLineBaseline(line) + 5.dp.toPx()
+                    drawLine(freshColor.copy(alpha = alpha), Offset(left, y), Offset(right, y), 2.dp.toPx())
+                }
+            },
+    )
+}
+
+/** Above the keyboard while editing: 整理, 按住说话 (at the cursor), hide the keyboard. */
+@Composable
+private fun Tools(m: AppModel, doc: Doc, talk: DocDictation, onHide: () -> Unit) {
+    val p = Tokens.palette
+    val pending = doc.tidyRanges.fitting(doc.content).isNotEmpty()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(p.surface)
+            .drawBehind { drawLine(p.line, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) }
+            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+            .height(56.dp)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            Modifier.height(44.dp).pressable(CircleShape) { if (!pending) m.toast("没有待整理的文字") }.dim(!pending).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Ico(Icons.Sparkle, p.ink2, 18.dp)
+            Text("整理", color = p.ink2, fontSize = 14.sp)
+        }
+        HoldButton(m, talk, Modifier.weight(1f).height(42.dp), fontSize = 15.sp, glow = 4.dp, shadow = false)
+        Box(Modifier.size(44.dp).pressable(CircleShape, onClick = onHide), contentAlignment = Alignment.Center) {
+            Ico(Icons.KbHide, p.ink2)
+        }
+    }
+}
+
+/** Flips "[ ]" and "[x]" at the given offset of the source. */
+private fun toggleTask(m: AppModel, doc: Doc, at: Int) {
+    val c = doc.content
+    if (at + 1 >= c.length || c[at] != '[') return
+    val now = if (c[at + 1] == ' ') 'x' else ' '
+    m.library.edit(doc.id, DocPatch(content = c.substring(0, at + 1) + now + c.substring(at + 2)))
+}
+
+@Composable
+private fun DocBar(m: AppModel, doc: Doc?, scrolled: Boolean, onMore: () -> Unit, editing: Boolean = false, onDone: () -> Unit = {}) {
+    val p = Tokens.palette
+    val shadow by animateFloatAsState(if (scrolled) 1f else 0f, label = "bar")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .drawBehind {
+                if (shadow > 0f) {
+                    drawRect(Color.Black.copy(alpha = .06f * shadow), topLeft = Offset(0f, size.height), size = androidx.compose.ui.geometry.Size(size.width, 1.dp.toPx() * 6))
+                    drawLine(p.line.copy(alpha = shadow), Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
+                }
+            }
+            .padding(start = 4.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(
+            Modifier
+                .height(48.dp)
+                .pressable(RoundedCornerShape(24.dp)) { m.back() }
+                .padding(start = 4.dp, end = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Ico(Icons.Back, p.ink2, 26.dp)
+            Text("文稿", color = p.ink2, fontSize = 16.sp)
+        }
+        Text(
+            doc?.title ?: "", color = p.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).graphicsLayer { alpha = shadow; translationY = (1 - shadow) * 4.dp.toPx() },
+        )
+        if (doc != null && editing) {
+            Box(
+                Modifier.height(40.dp).pressable(RoundedCornerShape(20.dp), pressed = p.accent.copy(alpha = .1f), onClick = onDone).padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text("完成", color = p.accent, fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold) }
+        } else if (doc != null) {
+            Box(Modifier.size(48.dp).pressable(CircleShape, onClick = onMore), contentAlignment = Alignment.Center) {
+                Ico(Icons.MoreV, p.ink2)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineBar() {
+    val p = Tokens.palette
+    Row(
+        Modifier
+            .padding(start = 16.dp, end = 16.dp, bottom = 4.dp)
+            .fillMaxWidth()
+            .height(36.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(p.well)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Ico(Icons.CloudOff, p.ink2, 18.dp)
+        Text("离线，只能查看", color = p.ink2, fontSize = 13.5.sp)
+    }
+}
+
+@Composable
+private fun Chip(content: @Composable () -> Unit) {
+    val p = Tokens.palette
+    Row(
+        Modifier.height(26.dp).clip(RoundedCornerShape(7.dp)).background(p.well).padding(horizontal = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) { content() }
+}
+
+@Composable
+private fun ChipText(text: String, color: Color = Tokens.palette.ink.copy(alpha = .62f)) = Text(text, color = color, fontSize = 12.5.sp)
+
+/** The colour dot, edit time, word count and save state under the title. */
+@Composable
+private fun Meta(m: AppModel, doc: Doc, onDot: () -> Unit) {
+    val p = Tokens.palette
+    val status = m.library.status[doc.id]
+    // The count follows what is saved, so it stays still while typing.
+    var counted by remember(doc.id) { mutableStateOf(doc.content) }
+    if (status == null && counted != doc.content) counted = doc.content
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(26.dp).clip(RoundedCornerShape(7.dp)).background(p.well).pressable(RoundedCornerShape(7.dp), onClick = onDot),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.size(13.dp).clip(CircleShape).background(p.tint(doc.color).base).border(1.dp, Color.Black.copy(alpha = .12f), CircleShape))
+        }
+        Chip { ChipText(shortTime(doc.updated)) }
+        Chip { ChipText("${countWords(counted)} 字") }
+        Chip {
+            when {
+                !m.online -> {
+                    Ico(Icons.CloudOff, p.ink.copy(alpha = .62f), 13.dp)
+                    ChipText("离线")
+                }
+                status == SaveStatus.Error -> ChipText("保存失败", p.rec)
+                status == SaveStatus.Saving -> ChipText("保存中…")
+                else -> ChipText("已保存")
+            }
+        }
+    }
+}
+
+/** The six colours in a floating card under the dot (.palette). */
+@Composable
+private fun ColorPopup(current: String, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    val p = Tokens.palette
+    androidx.compose.ui.window.Popup(
+        offset = with(LocalDensity.current) { androidx.compose.ui.unit.IntOffset(0, 36.dp.roundToPx()) },
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+    ) {
+        Row(
+            Modifier
+                .padding(bottom = 16.dp, end = 16.dp)
+                .shadow(24.dp, RoundedCornerShape(18.dp), ambientColor = Color.Black.copy(alpha = .22f), spotColor = Color.Black.copy(alpha = .22f))
+                .background(p.surface, RoundedCornerShape(18.dp))
+                .border(1.dp, p.line, RoundedCornerShape(18.dp))
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            for (name in TintNames) ColorSwatch(p.tint(name).base, selected = name == current, size = 34.dp) { onPick(name) }
+        }
+    }
+}
+
+/** The floating bar in view mode: 整理 ｜ 按住说话 ｜ 键盘. */
+@Composable
+private fun Dock(m: AppModel, doc: Doc, talk: DocDictation, onKeyboard: () -> Unit, modifier: Modifier) {
+    val p = Tokens.palette
+    Row(
+        modifier
+            .padding(start = 14.dp, end = 14.dp, bottom = bottomGap())
+            .fillMaxWidth()
+            .shadow(28.dp, CircleShape, ambientColor = Color.Black.copy(alpha = .22f), spotColor = Color.Black.copy(alpha = if (p.dark) .6f else .22f))
+            .background(p.surface.copy(alpha = .96f), CircleShape)
+            .border(1.dp, p.line, CircleShape)
+            .padding(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val pending = doc.tidyRanges.fitting(doc.content).isNotEmpty()
+        DockSide(Icons.Sparkle, "整理", disabled = !pending) { if (!pending) m.toast("没有待整理的文字") }
+        HoldButton(m, talk, Modifier.weight(1f).height(56.dp))
+        DockSide(Icons.Keyboard, "键盘", onClick = onKeyboard)
+    }
+}
+
+@Composable
+private fun DockSide(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, disabled: Boolean = false, onClick: () -> Unit) {
+    val p = Tokens.palette
+    Column(
+        Modifier
+            .width(84.dp)
+            .height(52.dp)
+            .pressable(CircleShape, onClick = onClick)
+            .dim(disabled),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
+    ) {
+        Ico(icon, p.ink2, 18.dp)
+        Text(label, color = p.ink2, fontSize = 12.sp, lineHeight = 16.sp)
+    }
+}
+
+/**
+ * Dictation into a document. View mode writes at the end; the editor moves
+ * [at] to its cursor before talking starts. What is heard shows faintly at
+ * [at]; the final text goes in as one edit, is marked for tidying and gets
+ * the fading underline (.fresh).
+ */
+class DocDictation(private val m: AppModel, private val id: Long, private val scope: CoroutineScope) : DictationTarget {
+    var interim by mutableStateOf<String?>(null)
+        private set
+    var at by mutableStateOf(0)
+    /** Where the insertion point is when talking starts; the end by default. */
+    var insertionPoint: () -> Int = { m.library.doc(id)?.content?.length ?: 0 }
+    /** Called with [from, to) of the text just written. */
+    var onWritten: (Int, Int) -> Unit = { _, _ -> }
+    var fresh by mutableStateOf<Pair<Int, Int>?>(null)
+    val freshAlpha = Animatable(1f)
+    private var fading: Job? = null
+
+    override fun begin() {
+        at = insertionPoint()
+        interim = ""
+    }
+
+    override fun interim(text: String) {
+        if (interim != null) interim = text
+    }
+
+    override fun commit(text: String, error: String?) {
+        interim = null
+        if (error != null) m.toast(error)
+        val d = m.library.doc(id) ?: return
+        if (text.isEmpty()) return
+        val c = d.content
+        val a = at.coerceIn(0, c.length)
+        val b = a + text.length
+        val ranges = d.tidyRanges.fitting(c).mapped(Change(a, a, text.length), manual = false).plus(a, b)
+        m.library.edit(id, top.onlyquant.tingxie.data.DocPatch(content = c.substring(0, a) + text + c.substring(a), tidyRanges = ranges))
+        showFresh(a, b)
+        onWritten(a, b)
+    }
+
+    override fun cancel() {
+        interim = null
+    }
+
+    /** Underlines [from, to) for 2.5 s, then fades it out over 1.2 s. */
+    fun showFresh(from: Int, to: Int) {
+        fading?.cancel()
+        fresh = from to to
+        fading = scope.launch {
+            freshAlpha.snapTo(1f)
+            delay(2500)
+            freshAlpha.animateTo(0f, androidx.compose.animation.core.tween(1200))
+            fresh = null
+        }
+    }
+}

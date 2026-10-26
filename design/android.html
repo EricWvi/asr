@@ -745,7 +745,7 @@ svg { display: block; }
         <h1 class="title" id="docTitle">2026/10/24 14:32</h1>
         <div class="meta">
           <button class="dot-btn" id="dotBtn"><span></span></button>
-          <span class="chip">今天 14:32</span><span class="chip" id="wordChip">612 字</span><span class="chip" id="syncChip">已同步</span>
+          <span class="chip">今天 14:32</span><span class="chip" id="wordChip">612 字</span><span class="chip" id="syncChip">已保存</span>
           <div class="palette" id="palette" hidden></div>
         </div>
       </div>
@@ -1145,7 +1145,7 @@ const setEditing = (on, at) => {
   $('dock').hidden = on || !!root.dataset.fab; $('tools').hidden = !on;
   $('docMore').hidden = on; $('docDone').hidden = !on;
   ime(on);
-  $('syncChip').textContent = '已同步';
+  $('syncChip').textContent = '已保存';
   if (on && at !== false) {
     const ln = at || $('lastLn');
     ln.append(caret);

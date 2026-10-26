@@ -8,7 +8,7 @@
 - OIDC：照搬 ../homepage 的 internal/auth，配置格式参考它的 config.example.yaml。设计 token 不沿用 homepage 的。
 - 顺序：Web 语音笔记（PC 加手机网页）→ 安卓 → Mac。
 - 文稿首版在线优先：服务端是唯一数据源，编辑后防抖保存，同一份文稿以最后一次写入为准。离线时只能看缓存，不能编辑。
-- 存储格式是 Markdown 纯文本，方言固定为 GFM（表格、任务列表、删除线、围栏代码块），另加 `==高亮==`。公式、Mermaid、脚注都不支持。
+- 存储格式是 Markdown 纯文本，方言固定为 GFM（表格、任务列表、删除线、围栏代码块），另加 `==高亮==`。公式和 Mermaid 网页端渲染、安卓端按原文显示；脚注不支持。
 - ASR 边说边出字：后端通过 WebSocket 代理 DashScope 的 `/api-ws/v1/inference` duplex 接口，开启中间结果。
 - 「整理」只处理上次整理之后新转写、且没有被手动改过的文字。整理结果原地替换，可以撤销。
 - 原生客户端登录：用系统浏览器走 OIDC，回调后发放长期有效的设备 token。
@@ -203,12 +203,24 @@
 
 ## 阶段 9：安卓客户端（Compose）
 
-- [ ] 登录（阶段 8 的流程）。
-- [ ] 两种模式：发送到电脑（录音转写后推到 Mac）和语音笔记（和 Web 共用文稿 API）。
+- [x] 登录（阶段 8 的流程）。
+- [ ] 两种模式：发送到电脑（录音转写后推到 Mac）和语音笔记（和 Web 共用文稿 API）。语音笔记已完成，发送到电脑放在最后做。
 - [ ] 发送到电脑：显示当前目标 Mac，可以切换；没有 Mac 在线时提示，并保留文字以便复制。本地保留最近几条发送记录，可以重发或复制。
-- [ ] 录音：AudioRecord 采 16 kHz PCM，走同一个 `/api/asr`。
-- [ ] 编辑器：BasicTextField 加 VisualTransformation 做实时高亮；查看模式用 multiplatform-markdown-renderer；勾选待办时回写源文本。
-- [ ] 拿阶段 3 的 GFM 样例文稿对照渲染结果。
+- [x] 录音：AudioRecord 采 16 kHz PCM，走同一个 `/api/asr`。
+- [x] 编辑器：BasicTextField 加 VisualTransformation 做实时高亮；查看模式用 multiplatform-markdown-renderer；勾选待办时回写源文本。
+- [x] 拿阶段 3 的 GFM 样例文稿对照渲染结果。
+- [ ] 整理、个人资料与头像、设备页。
+- [ ] 真机验证：Custom Tab 跳回 `tingxie://`、真实麦克风录音、键盘弹起。
+
+实现时定下的细节（工程在 `android/`，包名 `top.onlyquant.tingxie`，minSdk 29，自己安装 APK）：
+
+- 构建：AGP 9 + Kotlin 2.4 + Compose BOM，用 Android Studio 自带的 JBR（`JAVA_HOME=/Applications/Android Studio.app/Contents/jbr/Contents/Home`），`cd android && ./gradlew installDebug`。debug 包允许明文 HTTP，方便连局域网的开发服务；release 先用 debug 签名。
+- 颜色 token 由浏览器解析原型的 oklch 混色得到，写死在 `ui/theme/Theme.kt`；图标由原型的 SVG 生成（`ui/Icons.kt`）。
+- 登录：服务器地址保存在本地，登录页可改（局域网开发服务填 `http://<Mac IP>:36750`）。PKCE 的 state 和 verifier 存盘，浏览器往返期间进程被杀也能接上。从 Custom Tab 回来却没有回调，按「已取消登录」处理。设备名取系统的设备名称，没有就用型号。token 失效（401）时回到登录页，提示「登录已失效，请重新登录」；退出登录要连得上服务器，离线时提示「离线时无法退出登录」。
+- 文稿：列表和打开过的文稿缓存在本地，离线可以看。保存照搬网页端的保存队列：防抖 800 ms、失败 5 秒后重试；颜色立即保存；没发出的修改存盘，下次启动接着发。保存状态的文案和网页一致（已保存、保存中…、保存失败、离线），字数算法移植自 alfaaz，跟随已保存的内容。新建后一个字没写就返回列表，这篇自动删除。
+- 查看模式：段落间距沿用原型 CSS 的外边距，行内换行按换行显示（和网页编辑器一致）。只有 `[文字](url)` 是链接，引用式链接和脚注按原文显示。行内代码、高亮、搜索命中的底色贴着字形画圆角，不撑满行高。表格按列对齐（`:---:`、`---:`）。
+- 录音：按住先开麦克风缓存音频，300 ms 后才识别；手指上移超过 64dp 进入取消状态；5 分钟上限、最后 30 秒倒计时、离开文稿时丢弃、应用切到后台按松手处理，规则同网页。查看模式写到文末，编辑模式写在光标处。写入后转写区间记为待整理（规则移植自 `editor/tidy.ts`），手动改到区间内部就去掉标记。debug 包若有 `files/fake-mic.wav`，就用它代替麦克风，方便在模拟器上测试。
+- 编辑模式：点正文时，光标放在所点那一段的对应位置，这一段在屏幕上的位置不变。编辑器保留原文的空行（每行一个行高，同原型），代码块整块画底色。回车续写列表，空的列表项上回车结束列表。系统返回键、「完成」和工具栏的收起键盘都会回到查看模式。
 
 原型定下的设计（效果见 design/android.html，右下角「状态」菜单列出全部锚点；落选变体 `#doc-fab`、`#asr-error-card`、`#list-blur`、`#list-fab-wide`）：
 
