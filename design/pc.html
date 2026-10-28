@@ -113,7 +113,8 @@ svg { display: block; }
   background: var(--surface); box-shadow: var(--shadow-sm);
   color: var(--accent);
 }
-.brand-name { font: 700 18px/1 "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif; letter-spacing: .06em; }
+.brand-name { font: 700 18px/1 "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif; display: inline-flex; align-items: center; gap: 4px; }
+.brand-dot { width: 3px; height: 3px; flex-shrink: 0; border-radius: 50%; background: currentColor; }
 .brand-spacer { flex: 1; }
 .icon-btn {
   width: 30px; height: 30px; border-radius: 9px;
@@ -679,7 +680,7 @@ kbd {
   <aside class="sidebar">
     <div class="brand">
       <div class="brand-mark"><svg class="icon"><use href="#i-mic"/></svg></div>
-      <div class="brand-name">听·写</div>
+      <div class="brand-name" aria-label="听·写"><span aria-hidden="true">听</span><span class="brand-dot" aria-hidden="true"></span><span aria-hidden="true">写</span></div>
       <div class="brand-spacer"></div>
       <button class="icon-btn" title="收起侧栏"><svg class="icon"><use href="#i-sidebar"/></svg></button>
     </div>

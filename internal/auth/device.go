@@ -377,7 +377,8 @@ svg{display:block}.icon{width:16px;height:16px;stroke:currentColor;fill:none;str
 .card{width:100%;max-width:380px;padding:28px 28px 24px;border-radius:20px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line),var(--shadow-md)}
 .brand{display:flex;align-items:center;gap:14px;margin-bottom:22px}
 .brand-mark{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--surface);box-shadow:var(--shadow-sm)}.logo{width:24px}
-.brand-name{font:700 18px/1 "Songti SC","Noto Serif SC","Source Han Serif SC",serif;letter-spacing:.06em}
+.brand-name{font:700 18px/1 "Songti SC","Noto Serif SC","Source Han Serif SC",serif;display:inline-flex;align-items:center;gap:4px}
+.brand-dot { width: 3px; height: 3px; flex-shrink: 0; border-radius: 50%; background: currentColor; }
 h1{margin:0 0 16px;font-size:18px;font-weight:600;line-height:1.4}
 .rows{border-radius:12px;box-shadow:inset 0 0 0 1px var(--line)}
 .item{display:flex;align-items:center;gap:12px;padding:12px 14px}.item+.item{border-top:1px solid var(--line)}
@@ -395,7 +396,7 @@ h1{margin:0 0 16px;font-size:18px;font-weight:600;line-height:1.4}
 .result p a{color:var(--accent);text-decoration:none}.result p a:hover{text-decoration:underline}
 </style></head><body>
 <main class="card">
-<div class="brand"><div class="brand-mark"><svg class="logo" viewBox="0 1 398 383"><path fill="#fde8a7" d="M0.0 123.5A58.5 58.5 0 0 1 35.3 69.8L186.1 4.6A45.8 45.8 0 0 1 250.0 46.6L250.0 334.3A49.8 49.8 0 0 1 183.5 381.2L36.5 328.6A55.0 55.0 0 0 1 0.0 276.8Z"/><path fill="#fec6ab" d="M264.8 48.8A9.8 9.8 0 0 1 274.5 39.0L281.0 39.0A46.0 46.0 0 0 1 327.0 85.0L327.0 298.8A46.0 46.0 0 0 1 281.0 344.8L274.5 344.8A9.8 9.8 0 0 1 264.8 335.0Z"/><path fill="#bcc6fa" d="M341.8 87.0A8.2 8.2 0 0 1 350.0 78.8L355.2 78.8A42.5 42.5 0 0 1 397.8 121.2L397.8 259.8A42.5 42.5 0 0 1 355.2 302.2L350.0 302.2A8.2 8.2 0 0 1 341.8 294.0Z"/><path fill="#f5c258" d="M57.6 132.4L179.6 116.2A20.0 20.0 0 1 1 183.8 155.9L61.0 165.2A16.5 16.5 0 0 1 57.6 132.4Z"/><path fill="#f5c258" d="M59.1 184.8L154.8 183.8A18.5 18.5 0 1 1 154.3 220.7L58.7 217.2A16.2 16.2 0 0 1 59.1 184.8Z"/><path fill="#f5c258" d="M60.9 238.3L99.7 241.0A17.0 17.0 0 1 1 96.9 274.9L58.2 271.2A16.5 16.5 0 0 1 60.9 238.3Z"/></svg></div><div class="brand-name">听 · 写</div></div>
+<div class="brand"><div class="brand-mark"><svg class="logo" viewBox="0 1 398 383"><path fill="#fde8a7" d="M0.0 123.5A58.5 58.5 0 0 1 35.3 69.8L186.1 4.6A45.8 45.8 0 0 1 250.0 46.6L250.0 334.3A49.8 49.8 0 0 1 183.5 381.2L36.5 328.6A55.0 55.0 0 0 1 0.0 276.8Z"/><path fill="#fec6ab" d="M264.8 48.8A9.8 9.8 0 0 1 274.5 39.0L281.0 39.0A46.0 46.0 0 0 1 327.0 85.0L327.0 298.8A46.0 46.0 0 0 1 281.0 344.8L274.5 344.8A9.8 9.8 0 0 1 264.8 335.0Z"/><path fill="#bcc6fa" d="M341.8 87.0A8.2 8.2 0 0 1 350.0 78.8L355.2 78.8A42.5 42.5 0 0 1 397.8 121.2L397.8 259.8A42.5 42.5 0 0 1 355.2 302.2L350.0 302.2A8.2 8.2 0 0 1 341.8 294.0Z"/><path fill="#f5c258" d="M57.6 132.4L179.6 116.2A20.0 20.0 0 1 1 183.8 155.9L61.0 165.2A16.5 16.5 0 0 1 57.6 132.4Z"/><path fill="#f5c258" d="M59.1 184.8L154.8 183.8A18.5 18.5 0 1 1 154.3 220.7L58.7 217.2A16.2 16.2 0 0 1 59.1 184.8Z"/><path fill="#f5c258" d="M60.9 238.3L99.7 241.0A17.0 17.0 0 1 1 96.9 274.9L58.2 271.2A16.5 16.5 0 0 1 60.9 238.3Z"/></svg></div><div class="brand-name" aria-label="听·写"><span aria-hidden="true">听</span><span class="brand-dot" aria-hidden="true"></span><span aria-hidden="true">写</span></div></div>
 {{if eq .Kind "ask"}}
 <h1>允许这台设备登录？</h1>
 <div class="rows">

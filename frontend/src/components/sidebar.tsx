@@ -17,7 +17,11 @@ export function Sidebar({ user }: { user: User }) {
         <div className="grid size-[34px] place-items-center rounded-[10px] bg-surface shadow-sm">
           <img src={logo} alt="" className="w-6" />
         </div>
-        <div className="font-serif text-lg leading-none font-bold tracking-[.06em]">听·写</div>
+        <div aria-label="听·写" className="flex items-center gap-1 font-serif text-lg leading-none font-bold">
+          <span aria-hidden="true">听</span>
+          <span aria-hidden="true" className="size-[3px] shrink-0 rounded-full bg-current" />
+          <span aria-hidden="true">写</span>
+        </div>
       </div>
 
       <button
