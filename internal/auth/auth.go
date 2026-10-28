@@ -333,7 +333,7 @@ func readFlow(r *http.Request) (loginFlow, bool) {
 
 var pageTmpl = template.Must(template.New("page").Parse(`<!doctype html>
 <html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light dark"><title>听写</title>
+<meta name="color-scheme" content="light dark"><title>听 · 写</title>
 <style>body{font:15px system-ui,sans-serif;background:#faf8f5;color:#1d1d1f;display:grid;place-items:center;min-height:100vh;margin:0}
 @media (prefers-color-scheme:dark){body{background:#1b1b1d;color:#f2f2f4}}a{color:inherit}</style>
 <p>{{.}} <a href="/auth/login">重新登录</a></p></html>`))
