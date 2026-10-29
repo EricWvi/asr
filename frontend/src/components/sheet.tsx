@@ -1,5 +1,3 @@
-import NumberFlow from "@number-flow/react";
-import { countWords } from "alfaaz";
 import { ChevronLeftIcon, KeyboardIcon, MicIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -52,7 +50,6 @@ export function Sheet({ doc }: { doc: DocSummary }) {
         <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
           <ColorPicker doc={doc} />
           <span className={chip}>{shortTime(new Date(doc.updated_at))}</span>
-          <WordCount id={doc.id} />
           <SaveState id={doc.id} />
         </div>
         <div className="mt-6 h-px bg-paper-line" />
@@ -207,27 +204,6 @@ function ColorPicker({ doc }: { doc: DocSummary }) {
         ))}
       </PopoverContent>
     </Popover>
-  );
-}
-
-/**
- * Words as alfaaz counts them, each CJK character being one. The count
- * follows what is saved, so it stays still while typing, and its digits
- * roll when it changes.
- */
-function WordCount({ id }: { id: number }) {
-  const { data } = useDocument(id);
-  const saved = useSaveStatus((s) => !s.status[id]);
-  const [shown, setShown] = useState<{ id: number; content: string }>();
-  if (data && (shown?.id !== id || (saved && shown.content !== data.content))) {
-    setShown({ id, content: data.content });
-  }
-  if (!shown || shown.id !== id) return null;
-  return (
-    <span className={chip}>
-      {/* Keyed so another document's count shows at once instead of rolling. */}
-      <NumberFlow key={id} value={countWords(shown.content)} suffix=" 字" />
-    </span>
   );
 }
 
