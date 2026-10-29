@@ -2,17 +2,73 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { Tag, tags } from "@lezer/highlight";
-import type { Element, MarkdownConfig } from "@lezer/markdown";
+import { parser as baseParser, Strikethrough } from "@lezer/markdown";
+import type { Element, InlineContext, MarkdownConfig } from "@lezer/markdown";
 
 /** Style tag for the text inside ==highlight==. */
 export const highlightTag = Tag.define();
 
 const HighlightDelim = { resolve: "Highlight", mark: "HighlightMark" };
 const Punctuation = /[\p{P}\p{S}]/u;
+const CJK = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Hangul}\p{sc=Bopomofo}\u3000-\u303f\uff00-\uffef]/u;
+
+/**
+ * Flanking rules for a delimiter run between `before` and `after`, made
+ * CJK-friendly as markdown-cjk-friendly does: punctuation on one side may
+ * also face a CJK character on the other, so `**哨兵（sentinel）**解决`
+ * and `**加粗。**有` close although no space follows the full-width mark.
+ */
+function flanking(before: string, after: string) {
+  const sBefore = /\s|^$/.test(before);
+  const sAfter = /\s|^$/.test(after);
+  const pBefore = Punctuation.test(before);
+  const pAfter = Punctuation.test(after);
+  return {
+    left: !sAfter && (!pAfter || sBefore || pBefore || CJK.test(before)),
+    right: !sBefore && (!pBefore || sAfter || pAfter || CJK.test(after)),
+    pBefore,
+    pAfter,
+  };
+}
+
+type InlineParse = (cx: InlineContext, next: number, pos: number) => number;
+
+/**
+ * Wraps a built-in delimiter parser and recomputes the sides of the
+ * delimiter it appended with `flanking`. The delimiter types are private
+ * to @lezer/markdown, and Emphasis needs its own to become StrongEmphasis,
+ * so this patches the run in place rather than re-adding it.
+ */
+function cjkFriendly(parse: InlineParse): InlineParse {
+  return (cx, next, pos) => {
+    const end = parse(cx, next, pos);
+    if (end < 0) return end;
+    const parts = (cx as unknown as { parts: { side: number }[] }).parts;
+    const { left, right, pBefore, pAfter } = flanking(cx.slice(pos - 1, pos), cx.slice(end, end + 1));
+    const underscore = next == 95;
+    const open = left && (!underscore || !right || pBefore);
+    const close = right && (!underscore || !left || pAfter);
+    parts[parts.length - 1]!.side = (open ? 1 : 0) | (close ? 2 : 0);
+    return end;
+  };
+}
+
+const builtinInline = (name: string) => {
+  const p = baseParser as unknown as { inlineParsers: InlineParse[]; inlineNames: string[] };
+  return p.inlineParsers[p.inlineNames.indexOf(name)]!;
+};
+
+/** `*`, `_` and `~~` runs with CJK-friendly flanking. */
+export const CJKEmphasis: MarkdownConfig = {
+  parseInline: [
+    { name: "Emphasis", parse: cjkFriendly(builtinInline("Emphasis")) },
+    { name: "Strikethrough", parse: cjkFriendly(Strikethrough.parseInline![0]!.parse) },
+  ],
+};
 
 /**
  * `==highlight==`, parsed like GFM strikethrough: two `=` on each side,
- * following the same flanking rules, so it nests with bold and the rest.
+ * following the same CJK-friendly flanking rules, so it nests with bold and the rest.
  */
 export const Highlight: MarkdownConfig = {
   defineNodes: [
@@ -24,19 +80,8 @@ export const Highlight: MarkdownConfig = {
       name: "Highlight",
       parse(cx, next, pos) {
         if (next != 61 /* = */ || cx.char(pos + 1) != 61 || cx.char(pos + 2) == 61 || cx.char(pos - 1) == 61) return -1;
-        const before = cx.slice(pos - 1, pos);
-        const after = cx.slice(pos + 2, pos + 3);
-        const sBefore = /\s|^$/.test(before);
-        const sAfter = /\s|^$/.test(after);
-        const pBefore = Punctuation.test(before);
-        const pAfter = Punctuation.test(after);
-        return cx.addDelimiter(
-          HighlightDelim,
-          pos,
-          pos + 2,
-          !sAfter && (!pAfter || sBefore || pBefore),
-          !sBefore && (!pBefore || sAfter || pAfter),
-        );
+        const { left, right } = flanking(cx.slice(pos - 1, pos), cx.slice(pos + 2, pos + 3));
+        return cx.addDelimiter(HighlightDelim, pos, pos + 2, left, right);
       },
       after: "Emphasis",
     },
@@ -178,13 +223,13 @@ export const codeStyle = HighlightStyle.define([
 ]);
 
 /**
- * GFM plus ==highlight==, math and frontmatter, with the Markdown keymap
+ * GFM with CJK-friendly emphasis, plus ==highlight==, math and frontmatter, with the Markdown keymap
  * (list continuation). Fenced code parses as its language, loaded on demand.
  */
 export const markdownSupport = () =>
   markdown({
     base: markdownLanguage,
-    extensions: [Highlight, MathSyntax, Frontmatter],
+    extensions: [CJKEmphasis, Highlight, MathSyntax, Frontmatter],
     codeLanguages: languages,
     completeHTMLTags: false,
   });
