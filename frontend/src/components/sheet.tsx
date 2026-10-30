@@ -210,5 +210,5 @@ function ColorPicker({ doc }: { doc: DocSummary }) {
 function SaveState({ id }: { id: number }) {
   const status = useSaveStatus((s) => s.status[id]);
   if (status === "error") return <span className={cn(chip, "text-rec")}>保存失败</span>;
-  return <span className={chip}>{status === "saving" ? "保存中…" : "已保存"}</span>;
+  return <span className={chip}>{status === "saving" ? "保存中" : "已保存"}</span>;
 }
