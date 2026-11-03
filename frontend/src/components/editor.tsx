@@ -55,25 +55,31 @@ export function Editor({
   docId,
   initial,
   initialSpans,
+  revision,
   onChange,
 }: {
   docId: number;
   initial: string;
   /** Dictated text awaiting tidying (editor/tidy.ts). */
   initialSpans?: Span[];
+  /** Changing it starts the editor over from initial, keeping the cursor where it can. */
+  revision: number;
   onChange: (content: string, spans: Span[]) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const reload = useRef<(() => void) | null>(null);
   const changed = useRef(onChange);
   changed.current = onChange;
+  const latest = useRef({ initial, initialSpans });
+  latest.current = { initial, initialSpans };
 
   // The editor owns its text after mount; remount it (key) for another document.
   useEffect(() => {
     let saved = "";
-    const view = new EditorView({
-      parent: host.current!,
-      state: EditorState.create({
-        doc: initial,
+    const create = (doc: string, spans: Span[] | undefined, cursor: number) =>
+      EditorState.create({
+        doc,
+        selection: { anchor: Math.min(cursor, doc.length) },
         extensions: [
           history(),
           drawSelection(),
@@ -86,7 +92,7 @@ export function Editor({
           dictation,
           tidyRanges,
           searchHits,
-          initialTidyRanges(initialSpans, initial.length),
+          initialTidyRanges(spans, doc.length),
           // Ahead of the Markdown keymap, which has high precedence.
           Prec.highest(
             keymap.of([
@@ -111,17 +117,34 @@ export function Editor({
             setPending(spans.length > 0);
           }),
         ],
-      }),
-    });
-    saved = JSON.stringify(spansOf(view.state));
-    setPending(saved !== "[]");
+      });
+    const view = new EditorView({ parent: host.current!, state: create(initial, initialSpans, 0) });
+    const loaded = () => {
+      saved = JSON.stringify(spansOf(view.state));
+      setPending(saved !== "[]");
+    };
+    loaded();
+    // Setting a state dispatches nothing, so the reloaded text is not saved back.
+    reload.current = () => {
+      const { initial, initialSpans } = latest.current;
+      view.setState(create(initial, initialSpans, view.state.selection.main.head));
+      loaded();
+    };
     registerEditor(view, docId);
     return () => {
       setPending(false);
       registerEditor(null);
+      reload.current = null;
       view.destroy();
     };
   }, []);
+
+  const shown = useRef(revision);
+  useEffect(() => {
+    if (revision === shown.current) return;
+    shown.current = revision;
+    reload.current?.();
+  }, [revision]);
 
   return <div ref={host} />;
 }

@@ -7,6 +7,7 @@ import { useDocument } from "@/hooks/use-documents";
 import { COLORS, type DocSummary } from "@/lib/api";
 import { shortTime } from "@/lib/dates";
 import { focusEditor } from "@/lib/editor-focus";
+import { useReloads } from "@/lib/remote-edits";
 import { useSaveStatus } from "@/lib/save-queue";
 import { cn } from "@/lib/utils";
 import { edit, type InputMode, useWorkspace } from "@/lib/workspace";
@@ -72,6 +73,7 @@ export function Sheet({ doc }: { doc: DocSummary }) {
 
 function Body({ id }: { id: number }) {
   const { data, error, refetch } = useDocument(id);
+  const revision = useReloads((s) => s.revision);
   if (error)
     return (
       <p className="text-ink-3">
@@ -88,6 +90,7 @@ function Body({ id }: { id: number }) {
       docId={id}
       initial={data.content}
       initialSpans={data.tidy_ranges}
+      revision={revision}
       onChange={(content, spans) => edit(id, { content, tidy_ranges: spans })}
     />
   );

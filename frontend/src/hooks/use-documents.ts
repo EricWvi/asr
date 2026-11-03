@@ -7,7 +7,10 @@ export function useDocuments() {
   return useQuery({ queryKey: listKey, queryFn: api.documents });
 }
 
-/** One document with its content. It is loaded fresh each time it is opened. */
+/**
+ * One document with its content. It is loaded fresh each time it is
+ * opened, and checked again when the page is looked at (lib/remote-edits.ts).
+ */
 export function useDocument(id: number | null) {
   return useQuery({
     queryKey: docKey(id ?? 0),
