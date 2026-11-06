@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 
 import { dictation } from "@/editor/dictation";
 import { imageUpload } from "@/editor/images";
-import { dedentListItem, exitEmptyListItem, indentListItem } from "@/editor/lists";
+import { dedentListItem, exitEmptyListItem, indentListItem, splitAtItemStart } from "@/editor/lists";
 import { livePreview } from "@/editor/live-preview";
 import { searchHits } from "@/editor/search-hits";
 import { codeStyle, highlightTag, markdownSupport } from "@/editor/syntax";
@@ -97,6 +97,7 @@ export function Editor({
           Prec.highest(
             keymap.of([
               { key: "Enter", run: exitEmptyListItem },
+              { key: "Enter", run: splitAtItemStart },
               { key: "Tab", run: indentListItem, shift: dedentListItem },
             ]),
           ),

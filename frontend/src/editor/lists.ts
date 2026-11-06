@@ -1,3 +1,4 @@
+import { insertNewlineContinueMarkup } from "@codemirror/lang-markdown";
 import { type ChangeSpec, type EditorState, type Line, type StateCommand } from "@codemirror/state";
 
 /*
@@ -132,4 +133,31 @@ export const exitEmptyListItem: StateCommand = ({ state, dispatch }) => {
     }),
   );
   return true;
+};
+
+const itemStart = /^[\s>]*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?$/;
+
+/**
+ * Enter right before an item's text pushes the text down and leaves an empty
+ * item above. Markdown's continuation trims the space after that item's
+ * marker, and without it whatever is typed there next stops being a list
+ * item ("-x"), so the space goes back.
+ */
+export const splitAtItemStart: StateCommand = ({ state, dispatch }) => {
+  const sel = state.selection.main;
+  if (state.selection.ranges.length > 1 || !sel.empty) return false;
+  const l = state.doc.lineAt(sel.head);
+  const before = l.text.slice(0, sel.head - l.from);
+  if (!itemStart.test(before) || !l.text.slice(before.length).trim()) return false;
+  const marker = before.trimEnd();
+  return insertNewlineContinueMarkup({
+    state,
+    dispatch: (tr) =>
+      dispatch(
+        state.update(
+          { changes: tr.changes, selection: tr.selection, userEvent: "input", scrollIntoView: true },
+          { changes: { from: l.from + marker.length, insert: before.slice(marker.length) }, sequential: true },
+        ),
+      ),
+  });
 };

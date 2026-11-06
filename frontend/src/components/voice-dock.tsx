@@ -3,7 +3,7 @@ import { insertNewlineAndIndent } from "@codemirror/commands";
 import { CornerDownLeftIcon, LoaderCircleIcon, MicIcon, SparklesIcon } from "lucide-react";
 import { useEffect } from "react";
 
-import { exitEmptyListItem } from "@/editor/lists";
+import { exitEmptyListItem, splitAtItemStart } from "@/editor/lists";
 import { showUntidied } from "@/editor/tidy";
 import { currentEditor } from "@/lib/editor-focus";
 import { cn } from "@/lib/utils";
@@ -117,7 +117,7 @@ function Wave() {
 function newLine() {
   const view = currentEditor();
   if (!view) return;
-  if (!exitEmptyListItem(view) && !insertNewlineContinueMarkup(view)) insertNewlineAndIndent(view);
+  if (!exitEmptyListItem(view) && !splitAtItemStart(view) && !insertNewlineContinueMarkup(view)) insertNewlineAndIndent(view);
   view.focus();
 }
 
