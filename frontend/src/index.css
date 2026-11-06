@@ -256,6 +256,8 @@
 .cm-editor .cm-line.cm-md-list {
   position: relative;
   padding-left: calc((var(--depth) + 1) * 1.4em);
+  /* An empty item holds only its out-of-flow marker, which gives the line no height. */
+  min-height: 1lh;
 }
 .cm-editor .cm-line.cm-md-task {
   padding-left: calc(var(--depth) * 1.4em + 27px);
