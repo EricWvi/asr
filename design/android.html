@@ -224,6 +224,8 @@ svg { display: block; }
 .doc:active, .doc.pressed { background: var(--selected); }
 .swatch { flex: none; width: 20px; height: 26px; margin-top: 2px; border-radius: 5px; background: var(--tint-fill); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06); }
 .doc-body { min-width: 0; flex: 1; }
+/* 落选变体 #list-pin-icon：不分组，置顶的排在最前，标题右边一个小图钉 */
+.doc-pin { flex: none; width: 16px; height: 16px; margin-top: 5px; color: var(--ink-3); }
 .doc-title { font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .doc-snip { margin-top: 2px; font-size: 13.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .doc .hit { background: var(--tint-mark); color: var(--ink); border-radius: 3px; padding: 1px 0; }
@@ -654,6 +656,8 @@ svg { display: block; }
   <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></symbol>
   <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="i-pin-off" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89"/><path d="m2 2 20 20"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
@@ -929,10 +933,11 @@ svg { display: block; }
     <hr>
     <button class="danger" id="docDelete"><svg class="icon"><use href="#i-trash"/></svg>删除</button>
   </div>
-  <!-- 长按文稿：改颜色、重命名、复制、分享、删除 -->
+  <!-- 长按文稿：改颜色、置顶、重命名、复制、分享、删除 -->
   <div class="bsheet tinted" id="docSheet" hidden>
     <div class="bsheet-head"><span class="swatch" id="sheetSwatch"></span><span id="sheetTitle">2026/10/24 09:15</span></div>
     <div class="colors" id="sheetColors"></div>
+    <button class="opt" id="pinOpt"><svg class="icon"><use href="#i-pin"/></svg><span>置顶</span></button>
     <button class="opt" id="renameOpt"><svg class="icon"><use href="#i-edit"/></svg>重命名</button>
     <button class="opt"><svg class="icon"><use href="#i-copy"/></svg>复制 Markdown</button>
     <button class="opt"><svg class="icon"><use href="#i-share"/></svg>分享 .md 文件</button>
@@ -1025,17 +1030,19 @@ $('tabAllow').onclick = () => { show('login'); loginBusy(); setTimeout(() => ope
 const DOCS = [
   ['今天', '2026/10/24 14:32', '周末出行计划：先去杭州看看西溪湿地…', 'butter'],
   ['今天', '2026/10/24 09:15', '站会：同步 ASR 服务的 OIDC 接入进度', 'sky'],
-  ['昨天', '读书笔记 ·《置身事内》', '地方政府的土地财政逻辑，第三章讲得…', 'peach'],
+  ['昨天', '读书笔记 ·《置身事内》', '地方政府的土地财政逻辑，第三章讲得…', 'peach', 2],
   ['昨天', '2026/10/23 21:48', '睡前想到的几个点子', 'periwinkle'],
   ['本周早些时候', '2026/10/21 18:02', '采购清单：咖啡豆、滤纸、猫砂', 'mint'],
-  ['本周早些时候', 'Homelab 迁移备忘', 'frps 的配置记得同步到 shanghai', 'rose'],
+  ['本周早些时候', 'Homelab 迁移备忘', 'frps 的配置记得同步到 shanghai', 'rose', 1],
   ['本周早些时候', '2026/10/19 11:20', '和设计师聊的反馈', 'sky'],
   ['上周', '2026/10/17 20:05', '买菜清单', 'peach'],
   ['上周', '2026/10/16 08:42', '会议纪要：季度规划', 'rose'],
   ['上周', '2026/10/14 22:10', '读书摘抄', 'periwinkle'],
   ['九月', '2026/9/28 10:20', '旅行想法', 'sky'],
   ['九月', '2026/9/26 11:27', '代码备忘', 'mint'],
-].map(([g, t, s, c], i) => ({ id: i, g, t, s, c }));
+].map(([g, t, s, c, p], i) => ({ id: i, g, t, s, c, p }));
+// 置顶：分组在最上面，按置顶时间排，最近置顶的在前；置顶的文稿不再出现在下面的时间分组里。落选：不分组、行内图钉（#list-pin-icon）
+let pinIcons = false;
 const BODY0 = '周末出行 先去杭州看看西溪湿地 … 给猫留够两天的粮和水 下载离线地图';
 let filter = null, current = DOCS[0];
 const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -1046,7 +1053,7 @@ let words = [];
 const docRow = (d, html) => {
   const el = document.createElement('button');
   el.className = 'doc tinted'; paint(el, d.c);
-  el.innerHTML = html || `<span class="swatch"></span><span class="doc-body"><div class="doc-title">${esc(d.t)}</div><div class="doc-snip">${esc(d.s)}</div></span>`;
+  el.innerHTML = html || `<span class="swatch"></span><span class="doc-body"><div class="doc-title">${esc(d.t)}</div><div class="doc-snip">${esc(d.s)}</div></span>${pinIcons && d.p ? '<svg class="icon doc-pin"><use href="#i-pin"/></svg>' : ''}`;
   // 短按打开，长按（500 ms）弹出底部菜单
   let timer, long = false;
   el.onpointerdown = () => { long = false; timer = setTimeout(() => { long = true; openDocSheet(d, el); }, 500); };
@@ -1072,8 +1079,11 @@ const renderList = () => {
   }
   if (!DOCS.some((d) => !d.deleted)) { nav.innerHTML = '<div class="empty">还没有文稿</div>'; return; }
   if (!live.length) { nav.innerHTML = '<div class="empty">没有这种颜色的文稿</div>'; return; }
+  const pinned = live.filter((d) => d.p).sort((a, b) => b.p - a.p);
+  if (pinned.length && !pinIcons) { const h = document.createElement('div'); h.className = 'group'; h.textContent = '置顶'; nav.append(h); }
+  for (const d of pinned) nav.append(docRow(d));
   let g = null;
-  for (const d of live) {
+  for (const d of live.filter((d) => !d.p)) {
     if (d.g !== g) { g = d.g; const h = document.createElement('div'); h.className = 'group'; h.textContent = g; nav.append(h); }
     nav.append(docRow(d));
   }
@@ -1098,11 +1108,14 @@ const openDocSheet = (d, el) => {
   sheetDoc = d; el?.classList.add('pressed');
   paint($('docSheet'), d.c);
   $('sheetTitle').textContent = d.t;
+  $('pinOpt').querySelector('use').setAttribute('href', d.p ? '#i-pin-off' : '#i-pin');
+  $('pinOpt').querySelector('span').textContent = d.p ? '取消置顶' : '置顶';
   $('sheetColors').innerHTML = TINTS.map((c) => `<button style="--c: var(--${c})" data-c="${c}" aria-pressed="${c === d.c}"></button>`).join('');
   $('sheetColors').querySelectorAll('button').forEach((b) => b.onclick = () => { d.c = b.dataset.c; closeAll(); renderList(); });
   open('docSheet');
   el?.classList.add('pressed');
 };
+$('pinOpt').onclick = () => { sheetDoc.p = sheetDoc.p ? 0 : Date.now(); closeAll(); renderList(); };
 $('renameOpt').onclick = () => { closeAll(); $('renameInput').value = sheetDoc.t; open('renameDlg'); ime(true); $('renameInput').focus(); $('renameInput').select(); };
 const deleteDoc = (d) => {
   d.deleted = true; openList();
@@ -1495,7 +1508,10 @@ const STATES = {
   'list-fab-wide': () => { openList(); $('fab').hidden = true; $('fabWide').hidden = false; $('s-list').querySelector('.list-fade').hidden = true; },
   'list-sky': () => { filter = 'sky'; openList(); },
   'list-filter-empty': () => { DOCS.filter((d) => d.c === 'butter').forEach((d) => { d.c = 'sky'; }); filter = 'butter'; openList(); },
-  'list-sheet': () => { openList(); openDocSheet(DOCS[1], $('docs').querySelectorAll('.doc')[1]); },
+  'list-sheet-pinned': () => { openList(); openDocSheet(DOCS[2], $('docs').querySelectorAll('.doc')[0]); },
+  'list-peach': () => { filter = 'peach'; openList(); },
+  'list-pin-icon': () => { pinIcons = true; openList(); },
+  'list-sheet': () => { openList(); openDocSheet(DOCS[1], $('docs').querySelectorAll('.doc')[3]); },
   rename: () => { openList(); sheetDoc = DOCS[1]; $('renameOpt').onclick(); },
   deleted: () => { openList(); deleteDoc(DOCS[1]); },
   'list-empty': () => { DOCS.forEach((d) => { d.deleted = true; }); openList(); },
@@ -1535,6 +1551,7 @@ const GROUPS = [
   ['语音', [['录音中', 'rec'], ['最后 30 秒', 'countdown'], ['上滑取消', 'rec-cancel'], ['编辑时录音', 'rec-edit'], ['刚写入', 'rec-done'], ['识别中断', 'asr-error'], ['落选：卡片式提示', 'asr-error-card'], ['请求麦克风权限', 'mic-ask'], ['没有麦克风权限', 'mic-denied']]],
   ['整理', [['整理中', 'tidying'], ['整理完成', 'tidied'], ['没有待整理', 'tidy-empty'], ['整理失败', 'tidy-error']]],
   ['列表', [['文稿列表（启动）', ''], ['落选：毛玻璃', 'list-blur'], ['落选：扩展新建按钮', 'list-fab-wide'], ['只看天空色', 'list-sky'], ['筛选为空', 'list-filter-empty'], ['长按菜单', 'list-sheet'], ['重命名', 'rename'], ['删除后撤销', 'deleted'], ['没有文稿', 'list-empty']]],
+  ['置顶', [['置顶长按菜单', 'list-sheet-pinned'], ['只看桃色', 'list-peach'], ['落选：行内图钉', 'list-pin-icon']]],
   ['搜索', [['输入中', 'search-input'], ['搜索结果', 'search'], ['没有结果', 'search-empty'], ['正文命中', 'search-hit']]],
   ['发送到电脑', [['头像菜单', 'user-menu'], ['发送到电脑', 'send'], ['切换电脑', 'send-targets'], ['录音中', 'send-rec'], ['上滑取消', 'send-cancel'], ['发送中', 'send-sending'], ['已发送', 'send-done'], ['没有在线的电脑', 'send-offline'], ['电脑没有响应', 'send-timeout'], ['没有记录', 'send-empty'], ['离线', 'send-net-off']]],
   ['我的', [['个人资料', 'profile'], ['已有头像', 'profile-avatar'], ['裁剪头像', 'avatar-crop'], ['保存中', 'avatar-saving'], ['保存失败', 'avatar-error'], ['设备', 'devices'], ['退出登录', 'logout']]],

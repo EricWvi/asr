@@ -189,6 +189,10 @@ svg { display: block; }
   transition: background .2s;
 }
 .doc-body { min-width: 0; flex: 1; }
+/* 落选变体 #pin-icon：不分组，置顶的排在最前，标题右边一个小图钉 */
+.doc-pin { display: none; flex: none; width: 13px; height: 13px; margin-top: 4px; color: var(--ink-3); }
+.docs.pin-icons #pinGroup { display: none; }
+.docs.pin-icons .doc[data-pinned] .doc-pin { display: block; }
 .doc-title { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .doc-snip { margin-top: 1px; font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -673,6 +677,8 @@ kbd {
   <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
   <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></symbol>
   <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M15 8l4 4-4 4M19 12H9"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="i-pin-off" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89"/><path d="m2 2 20 20"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/></symbol>
   <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol>
 </svg>
 
@@ -696,6 +702,8 @@ kbd {
 
     <div class="section"><span>文稿</span><div class="filters" id="filters"><button class="fdot tinted" data-c="butter" style="--tint: var(--butter)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="peach" style="--tint: var(--peach)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="rose" style="--tint: var(--rose)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="periwinkle" style="--tint: var(--periwinkle)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="sky" style="--tint: var(--sky)" aria-pressed="false" title="只看这种颜色"><span></span></button><button class="fdot tinted" data-c="mint" style="--tint: var(--mint)" aria-pressed="false" title="只看这种颜色"><span></span></button></div></div>
     <nav class="docs">
+      <!-- 置顶：分组在最上面，按置顶时间排，最近置顶的在前；置顶的文稿不再出现在下面的时间分组里（#pinned 起都是这样） -->
+      <div class="group" id="pinGroup">置顶</div>
       <div class="group">今天</div>
       <button class="doc tinted" data-tint="butter" aria-current="true">
         <span class="swatch"></span>
@@ -706,7 +714,7 @@ kbd {
         <span class="doc-body"><div class="doc-title">2026/10/24 09:15</div><div class="doc-snip">站会：同步 ASR 服务的 OIDC 接入进度</div></span>
       </button>
       <div class="group">昨天</div>
-      <button class="doc tinted" data-tint="peach">
+      <button class="doc tinted" data-tint="peach" data-pinned="2">
         <span class="swatch"></span>
         <span class="doc-body"><div class="doc-title">读书笔记 ·《置身事内》</div><div class="doc-snip">地方政府的土地财政逻辑，第三章讲得…</div></span>
       </button>
@@ -719,7 +727,7 @@ kbd {
         <span class="swatch"></span>
         <span class="doc-body"><div class="doc-title">2026/10/21 18:02</div><div class="doc-snip">采购清单：咖啡豆、滤纸、猫砂</div></span>
       </button>
-      <button class="doc tinted" data-tint="rose">
+      <button class="doc tinted" data-tint="rose" data-pinned="1">
         <span class="swatch"></span>
         <span class="doc-body"><div class="doc-title">Homelab 迁移备忘</div><div class="doc-snip">frps 的配置记得同步到 shanghai</div></span>
       </button>
@@ -862,6 +870,7 @@ kbd {
 </div>
 
 <div class="menu" id="menu" role="menu" hidden>
+  <button role="menuitem" id="pinItem"><svg class="icon"><use href="#i-pin"/></svg><span>置顶</span></button>
   <button role="menuitem" id="renameItem"><svg class="icon"><use href="#i-edit"/></svg>重命名</button>
   <button role="menuitem"><svg class="icon"><use href="#i-copy"/></svg>复制 Markdown</button>
   <button role="menuitem"><svg class="icon"><use href="#i-download"/></svg>导出 .md 文件</button>
@@ -930,6 +939,20 @@ const docs = [...document.querySelectorAll('.doc')];
 const paint = (el, name) => { el.dataset.tint = name; el.style.setProperty('--tint', `var(--${name})`); };
 docs.forEach((d) => paint(d, d.dataset.tint));
 
+// 置顶：移到「置顶」分组的最前面；取消置顶回到原来的时间分组（原型里用占位节点记住原位置）
+const pinGroup = $('pinGroup');
+const pin = (d) => {
+  if (!d._home) { d._home = document.createComment('home'); d.before(d._home); }
+  d.dataset.pinned = '1';
+  pinGroup.after(d);
+};
+const unpin = (d) => {
+  delete d.dataset.pinned;
+  d._home.replaceWith(d); d._home = null;
+};
+docs.forEach((d) => d.insertAdjacentHTML('beforeend', '<svg class="icon doc-pin"><use href="#i-pin"/></svg>'));
+docs.filter((d) => d.dataset.pinned).sort((a, b) => b.dataset.pinned - a.dataset.pinned).forEach(pin);
+
 if (matchMedia('(prefers-color-scheme: dark)').matches) root.dataset.theme = 'dark';
 const syncThemeIcon = () => $('themeBtn').querySelector('use').setAttribute('href', root.dataset.theme === 'dark' ? '#i-sun' : '#i-moon');
 syncThemeIcon();
@@ -986,6 +1009,9 @@ const closeMenu = () => {
 const openMenu = (doc, x, y) => {
   closeMenu();
   doc.classList.add('menu-target');
+  const pinned = !!doc.dataset.pinned;
+  $('pinItem').querySelector('use').setAttribute('href', pinned ? '#i-pin-off' : '#i-pin');
+  $('pinItem').querySelector('span').textContent = pinned ? '取消置顶' : '置顶';
   const m = $('menu');
   m.hidden = false;
   m.style.left = Math.min(x, innerWidth - m.offsetWidth - 8) + 'px';
@@ -1018,6 +1044,7 @@ const deleteDoc = (doc) => {
   applyFilter();
 };
 $('renameItem').onclick = () => { const d = menuDoc; setTimeout(() => startRename(d)); };
+$('pinItem').onclick = () => { (menuDoc.dataset.pinned ? unpin : pin)(menuDoc); applyFilter(); };
 $('deleteItem').onclick = () => deleteDoc(menuDoc);
 
 document.addEventListener('click', closeMenu);
@@ -1348,7 +1375,9 @@ if (vt) { setInput(true); $('toastText').textContent = voiceToasts[vt]; $('undoB
 if (hash.includes('colors')) $('palette').hidden = false;
 const named = docs.find((d) => hash.includes(d.dataset.tint));
 if (named) named.click();
-if (hash.includes('menu') && !hash.includes('user-menu')) { const r = docs[1].getBoundingClientRect(); openMenu(docs[1], r.left + 120, r.top + 24); }
+if (hash.includes('pin-icon')) docList.classList.add('pin-icons');
+if (hash.includes('menu-pinned')) { const d = docs.find((x) => x.dataset.pinned); const r = d.getBoundingClientRect(); openMenu(d, r.left + 120, r.top + 24); }
+else if (hash.includes('menu') && !hash.includes('user-menu')) { const r = docs[1].getBoundingClientRect(); openMenu(docs[1], r.left + 120, r.top + 24); }
 if (hash.includes('rename')) startRename(docs[2]);
 if (hash.includes('toast')) deleteDoc(docs[1]);
 if (hash.includes('user-menu')) openUserMenu();
@@ -1381,6 +1410,7 @@ if (hash.includes('select')) {
   const groups = [
     ['基础', [['默认', ''], ['滚动后吸顶', 'scrolled'], ['选中文字', 'select'], ['取色板', 'colors'], ['落选：全部显示源码', 'source']]],
     ['侧栏', [['右键菜单', 'menu'], ['行内重命名', 'rename'], ['删除后撤销', 'toast'], ['只看天空色', 'only-sky'], ['列表滚到下面', 'listdown'], ['打开玫瑰色文稿', 'rose']]],
+    ['置顶', [['取消置顶菜单', 'menu-pinned'], ['只看桃色', 'only-peach'], ['落选：行内图钉', 'pin-icon']]],
     ['光标行', [['高亮和链接', 'at-mark'], ['列表', 'at-li'], ['待办', 'at-task'], ['引用', 'at-quote'], ['分隔线', 'at-hr'], ['代码块', 'at-code'], ['表格', 'at-table'], ['图片', 'at-img']]],
     ['语音', [['语音模式', 'voice'], ['录音中', 'rec'], ['最后 30 秒', 'countdown'], ['识别中断', 'asr-error'], ['没有麦克风权限', 'mic-denied'], ['没有麦克风', 'no-mic']]],
     ['整理', [['悬停整理', 'tidy-peek'], ['落选：淡色底', 'tidy-peek-fill'], ['整理中', 'tidying'], ['落选：呼吸', 'tidying-pulse'], ['整理完成', 'tidied'], ['没有待整理', 'tidy-empty'], ['整理失败', 'tidy-error']]],
