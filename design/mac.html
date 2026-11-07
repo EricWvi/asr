@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>听写 · Mac 原型</title>
+<style>
+/*
+ * Mac 客户端原型：只有菜单栏图标，没有窗口。它常驻连接服务器，安卓端「发送到电脑」
+ * 的文字插到当前光标处。token 沿用 pc.html；菜单本身尽量像系统菜单。
+ * 整体风格选定系统菜单（NSMenu）；落选的「系统菜单 + 头部」「弹出面板」已删除。
+ * 右下角「状态」菜单列出全部锚点（mac.html#<状态>，暗色加 dark- 前缀）。
+ */
+:root {
+  color-scheme: light;
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --ink: #1d1d1f;
+  --ink-2: #6e6e73;
+  --ink-3: #a1a1a6;
+  --line: #ebe8e3;
+  --hover: rgb(0 0 0 / 0.035);
+  --selected: rgb(0 0 0 / 0.06);
+  --chip: #f2f1ef;
+  --accent: #1a7cf5;
+  --rec: #f2544b;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05), 0 2px 8px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.04), 0 24px 56px -16px rgb(0 0 0 / 0.22);
+  --butter: #fbe69b;
+  --periwinkle: #b6c4f4;
+  --mint: #c6eac9;
+  --mint-deep: oklch(from var(--mint) 0.6 calc(c * 1.8) h);
+  --warn: #e8a33a;
+  --paper: color-mix(in oklch, var(--butter) 10%, #fff);
+
+  /* 系统界面（菜单栏、系统菜单、桌面）的颜色，不属于应用 token */
+  --sys-bar: rgb(246 246 248 / 0.55);
+  --sys-bar-ink: #1d1d1f;
+  --sys-menu: rgb(246 246 248 / 0.78);
+  --sys-menu-ink: #1d1d1f;
+  --sys-menu-ink-2: rgb(0 0 0 / 0.5);
+  --sys-menu-sep: rgb(0 0 0 / 0.1);
+  --sys-menu-hl: #2f7cf6;
+  --wall: linear-gradient(160deg, #b9c8e6 0%, #d9c3d5 45%, #efcfb3 100%);
+  --win: #fff;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1b1d;
+  --surface: #2a2a2d;
+  --ink: #f2f2f4;
+  --ink-2: #a0a0a7;
+  --ink-3: #6c6c72;
+  --line: #3a3a3e;
+  --hover: rgb(255 255 255 / 0.04);
+  --selected: rgb(255 255 255 / 0.08);
+  --chip: #36363a;
+  --accent: #3b8ef7;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 24px 56px -16px rgb(0 0 0 / 0.6);
+  --mint-deep: oklch(from var(--mint) 0.8 calc(c * 1.4) h);
+  --paper: color-mix(in oklch, var(--butter) 3%, var(--surface));
+  --sys-bar: rgb(30 30 34 / 0.5);
+  --sys-bar-ink: #f2f2f4;
+  --sys-menu: rgb(40 40 44 / 0.8);
+  --sys-menu-ink: #f2f2f4;
+  --sys-menu-ink-2: rgb(255 255 255 / 0.5);
+  --sys-menu-sep: rgb(255 255 255 / 0.1);
+  --wall: linear-gradient(160deg, #222a3d 0%, #3a2c3c 50%, #4a3a2c 100%);
+  --win: #1e1e20;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  min-height: 100vh; display: grid; place-items: center; padding: 24px 24px 72px;
+  background: color-mix(in oklch, var(--bg), #000 7%); color: var(--ink);
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+:root[data-theme="dark"] body { background: #0e0e0f; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: default; }
+svg { display: block; }
+.icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- 桌面 ---------- */
+.screen { position: relative; width: 1180px; height: 720px; border-radius: 14px; overflow: hidden; background: var(--wall); box-shadow: var(--shadow-lg); }
+.bar { position: absolute; inset: 0 0 auto; height: 30px; display: flex; align-items: center; padding: 0 10px; gap: 2px;
+  background: var(--sys-bar); backdrop-filter: blur(30px) saturate(1.6); color: var(--sys-bar-ink); font-size: 13px; z-index: 5; }
+.bar .m { padding: 0 9px; height: 24px; display: flex; align-items: center; border-radius: 6px; }
+.bar .m.b { font-weight: 700; }
+.bar .sp { flex: 1; }
+.bar .st { height: 24px; min-width: 30px; padding: 0 7px; display: grid; place-items: center; border-radius: 6px; position: relative; }
+.bar .st.open { background: rgb(127 127 127 / 0.28); }
+.bar .clock { padding: 0 8px; font-variant-numeric: tabular-nums; }
+.bar .st svg.sys { width: 17px; height: 17px; fill: currentColor; stroke: none; }
+
+/* 菜单栏图标：logo 的单色剪影，写字的三道横线挖空 */
+.tray { width: 19px; height: 18px; color: var(--sys-bar-ink); }
+.tray.dim { opacity: .4; }
+.tray-badge { position: absolute; right: 4px; top: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 1.5px var(--sys-bar); }
+
+
+/* 背后的文稿窗口，演示插入位置 */
+.win { position: absolute; left: 90px; top: 110px; width: 620px; height: 420px; border-radius: 12px; background: var(--win); box-shadow: 0 0 0 0.5px rgb(0 0 0 / .2), 0 20px 50px -12px rgb(0 0 0 / .35); overflow: hidden; }
+.win .tb { height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--line); color: var(--ink-2); font-size: 13px; }
+.win .tb i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; } .win .tb i:nth-child(2) { background: #febc2e; } .win .tb i:nth-child(3) { background: #28c840; }
+.win .tb span { flex: 1; text-align: center; margin-right: 52px; }
+.win .body { padding: 22px 28px; font-size: 14px; line-height: 1.75; color: var(--ink); }
+.win .body p { margin: 0 0 10px; }
+.caret { display: inline-block; width: 1.5px; height: 1.1em; vertical-align: -0.15em; background: var(--accent); animation: blink 1s steps(1) infinite; }
+.ins { background: color-mix(in oklch, var(--accent) 16%, transparent); border-radius: 3px; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- 菜单：原生 NSMenu ---------- */
+.menu { position: absolute; top: 34px; z-index: 6; min-width: 268px; padding: 5px; border-radius: 12px;
+  background: var(--sys-menu); backdrop-filter: blur(40px) saturate(1.8); color: var(--sys-menu-ink);
+  box-shadow: 0 0 0 0.5px rgb(0 0 0 / .18), inset 0 0 0 0.5px rgb(255 255 255 / .25), 0 12px 40px -8px rgb(0 0 0 / .3); font-size: 13px; }
+.menu .it { height: 24px; padding: 0 10px 0 24px; border-radius: 6px; display: flex; align-items: center; gap: 8px; position: relative; white-space: nowrap; }
+.menu .it:not(.off):hover, .menu .it.hl { background: var(--sys-menu-hl); color: #fff; }
+.menu .it:not(.off):hover .k, .menu .it.hl .k, .menu .it:not(.off):hover .sub { color: rgb(255 255 255 / .8); }
+.menu .it.off { color: var(--sys-menu-ink-2); }
+.menu .it .k { margin-left: auto; color: var(--sys-menu-ink-2); font-variant-numeric: tabular-nums; padding-left: 18px; }
+.menu .it .tick { position: absolute; left: 8px; width: 12px; height: 12px; stroke-width: 2.4; }
+.menu .it .lead { position: absolute; left: 8px; width: 8px; height: 8px; border-radius: 50%; }
+.menu .it .ic { width: 15px; height: 15px; margin-left: -18px; margin-right: 3px; }
+.menu .it .txt { overflow: hidden; text-overflow: ellipsis; max-width: 230px; }
+.menu .hd { padding: 6px 10px 2px 24px; font-size: 11px; font-weight: 600; color: var(--sys-menu-ink-2); }
+.menu .sep { height: 1px; margin: 5px 10px; background: var(--sys-menu-sep); }
+.menu .it.warn .ic { color: var(--warn); }
+.menu .it.warn:hover .ic { color: #fff; }
+
+
+/* 状态圆点 */
+.ok { background: var(--mint-deep); }
+.wait { background: var(--ink-3); }
+.bad { background: var(--warn); }
+
+
+/* ---------- 系统对话框（NSAlert）和系统权限提示 ---------- */
+.dim-bg { position: absolute; inset: 30px 0 0; z-index: 7; display: grid; place-items: start center; padding-top: 120px; }
+.alert { width: 260px; padding: 20px 16px 16px; border-radius: 18px; text-align: center;
+  background: var(--sys-menu); backdrop-filter: blur(40px) saturate(1.8); color: var(--sys-menu-ink);
+  box-shadow: 0 0 0 0.5px rgb(0 0 0 / .2), 0 24px 60px -12px rgb(0 0 0 / .45); }
+.alert .a-icon { width: 56px; height: 56px; margin: 0 auto 10px; border-radius: 13px; display: grid; place-items: center; background: var(--paper); box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
+:root[data-theme="dark"] .alert .a-icon { background: var(--chip); }
+.alert .a-icon .logo { width: 36px; }
+.alert h3 { margin: 0 0 4px; font-size: 13px; font-weight: 700; }
+.alert p { margin: 0 0 14px; font-size: 11.5px; line-height: 1.45; color: var(--sys-menu-ink-2); }
+.alert input { width: 100%; height: 24px; margin: -4px 0 14px; padding: 0 7px; border-radius: 6px; border: 0; font: inherit; font-size: 12px; color: var(--sys-menu-ink);
+  background: rgb(127 127 127 / 0.14); box-shadow: inset 0 0 0 0.5px rgb(127 127 127 / .35), 0 0 0 3px color-mix(in oklch, var(--sys-menu-hl) 45%, transparent); outline: none; }
+.alert .a-err { margin: -10px 0 12px; font-size: 11px; color: #e5484d; }
+.alert .a-btns { display: flex; flex-direction: column; gap: 7px; }
+.alert .a-btns.row { flex-direction: row; }
+.alert .a-btns button { flex: 1; height: 26px; border-radius: 999px; font-size: 12.5px; background: rgb(127 127 127 / 0.18); }
+.alert .a-btns button.def { background: var(--sys-menu-hl); color: #fff; }
+.alert .a-btns button.danger { color: #e5484d; }
+
+/* ---------- 浏览器窗口：登录回调页（客户端在 127.0.0.1 上自己返回的页面） ---------- */
+.browser { position: absolute; left: 230px; top: 80px; width: 720px; height: 520px; z-index: 4; border-radius: 12px; overflow: hidden; background: var(--bg);
+  box-shadow: 0 0 0 0.5px rgb(0 0 0 / .2), 0 24px 60px -12px rgb(0 0 0 / .4); display: flex; flex-direction: column; }
+.browser .b-tb { height: 44px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: var(--win); border-bottom: 1px solid var(--line); }
+.browser .b-tb i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; } .browser .b-tb i:nth-child(2) { background: #febc2e; } .browser .b-tb i:nth-child(3) { background: #28c840; }
+.browser .url { margin: 0 auto; width: 340px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 12.5px; color: var(--ink-2); background: var(--chip); }
+.browser .page { flex: 1; display: grid; place-items: center; padding: 24px; }
+.cb-card { width: 100%; max-width: 380px; padding: 28px 28px 24px; border-radius: 20px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lg); font-size: 14px; }
+.cb-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+.cb-brand .brand-mark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--surface); box-shadow: var(--shadow-sm); }
+:root[data-theme="dark"] .cb-brand .brand-mark { background: var(--chip); }
+.cb-brand .logo { width: 24px; }
+.brand-name { font: 700 18px/1 "Songti SC", "Noto Serif SC", serif; display: inline-flex; align-items: center; gap: 4px; }
+.brand-dot { width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+.result { text-align: center; padding: 8px 0 4px; }
+.mark { width: 44px; height: 44px; margin: 0 auto 14px; border-radius: 50%; display: grid; place-items: center; background: var(--chip); color: var(--ink-2); }
+.mark .icon { width: 20px; height: 20px; }
+.mark.ok { background: color-mix(in oklch, var(--accent) 14%, var(--surface)); color: var(--accent); }
+.result h1 { margin: 0 0 6px; font-size: 18px; font-weight: 600; line-height: 1.4; }
+.result p { margin: 0; font-size: 13px; color: var(--ink-2); }
+
+/* ---------- 原型专用：右下角状态菜单（不是界面的一部分） ---------- */
+.states-btn { position: fixed; right: 16px; bottom: 16px; z-index: 100; height: 32px; padding: 0 12px; border-radius: 999px; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lg); }
+.states { position: fixed; right: 16px; bottom: 56px; z-index: 100; width: 252px; max-height: calc(100vh - 80px); overflow: auto; padding: 5px; border-radius: 12px;
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-lg); scrollbar-width: thin; font-size: 13px; }
+.states h4 { margin: 0; padding: 8px 10px 3px; font-size: 11.5px; font-weight: 500; color: var(--ink-3); }
+.states button { width: 100%; height: 28px; padding: 0 10px; border-radius: 7px; display: flex; align-items: center; gap: 8px; text-align: left; font-size: 13px; cursor: pointer; }
+.states button:hover { background: var(--hover); }
+.states button[aria-current="true"] { background: var(--selected); font-weight: 500; }
+.states button code { margin-left: auto; font: 11px ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink-3); }
+.states .toggle { justify-content: space-between; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="logo" viewBox="0 1 398 383"><path fill="#fde8a7" d="M0.0 123.5A58.5 58.5 0 0 1 35.3 69.8L186.1 4.6A45.8 45.8 0 0 1 250.0 46.6L250.0 334.3A49.8 49.8 0 0 1 183.5 381.2L36.5 328.6A55.0 55.0 0 0 1 0.0 276.8Z"/><path fill="#fec6ab" d="M264.8 48.8A9.8 9.8 0 0 1 274.5 39.0L281.0 39.0A46.0 46.0 0 0 1 327.0 85.0L327.0 298.8A46.0 46.0 0 0 1 281.0 344.8L274.5 344.8A9.8 9.8 0 0 1 264.8 335.0Z"/><path fill="#bcc6fa" d="M341.8 87.0A8.2 8.2 0 0 1 350.0 78.8L355.2 78.8A42.5 42.5 0 0 1 397.8 121.2L397.8 259.8A42.5 42.5 0 0 1 355.2 302.2L350.0 302.2A8.2 8.2 0 0 1 341.8 294.0Z"/><path fill="#f5c258" d="M57.6 132.4L179.6 116.2A20.0 20.0 0 1 1 183.8 155.9L61.0 165.2A16.5 16.5 0 0 1 57.6 132.4Z"/><path fill="#f5c258" d="M59.1 184.8L154.8 183.8A18.5 18.5 0 1 1 154.3 220.7L58.7 217.2A16.2 16.2 0 0 1 59.1 184.8Z"/><path fill="#f5c258" d="M60.9 238.3L99.7 241.0A17.0 17.0 0 1 1 96.9 274.9L58.2 271.2A16.5 16.5 0 0 1 60.9 238.3Z"/></symbol>
+  <!-- 菜单栏用的单色图标（template image）：三块剪影，横线挖空 -->
+  <mask id="tray-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="398" height="385"><rect width="398" height="385" fill="#fff"/><path fill="#000" d="M57.6 132.4L179.6 116.2A20.0 20.0 0 1 1 183.8 155.9L61.0 165.2A16.5 16.5 0 0 1 57.6 132.4Z"/><path fill="#000" d="M59.1 184.8L154.8 183.8A18.5 18.5 0 1 1 154.3 220.7L58.7 217.2A16.2 16.2 0 0 1 59.1 184.8Z"/><path fill="#000" d="M60.9 238.3L99.7 241.0A17.0 17.0 0 1 1 96.9 274.9L58.2 271.2A16.5 16.5 0 0 1 60.9 238.3Z"/></mask>
+  <symbol id="tray" viewBox="-10 -9 418 403"><g fill="currentColor" mask="url(#tray-cut)"><path d="M0.0 123.5A58.5 58.5 0 0 1 35.3 69.8L186.1 4.6A45.8 45.8 0 0 1 250.0 46.6L250.0 334.3A49.8 49.8 0 0 1 183.5 381.2L36.5 328.6A55.0 55.0 0 0 1 0.0 276.8Z"/></g><path fill="currentColor" d="M264.8 48.8A9.8 9.8 0 0 1 274.5 39.0L281.0 39.0A46.0 46.0 0 0 1 327.0 85.0L327.0 298.8A46.0 46.0 0 0 1 281.0 344.8L274.5 344.8A9.8 9.8 0 0 1 264.8 335.0Z"/><path fill="currentColor" d="M341.8 87.0A8.2 8.2 0 0 1 350.0 78.8L355.2 78.8A42.5 42.5 0 0 1 397.8 121.2L397.8 259.8A42.5 42.5 0 0 1 355.2 302.2L350.0 302.2A8.2 8.2 0 0 1 341.8 294.0Z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16h.01"/></symbol>
+  <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.8a8 8 0 1 0 11.4 0"/></symbol>
+  <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  <symbol id="s-wifi" viewBox="0 0 16 16"><path d="M8 13.5 5.9 11.4a3 3 0 0 1 4.2 0zM3.8 9.3a6 6 0 0 1 8.4 0l-1.1 1.1a4.4 4.4 0 0 0-6.2 0zM1.6 7.1a9.1 9.1 0 0 1 12.8 0l-1.1 1.1a7.5 7.5 0 0 0-10.6 0z"/></symbol>
+  <symbol id="s-bat" viewBox="0 0 22 16"><rect x="1" y="4" width="17" height="8.5" rx="2.4" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/><rect x="2.6" y="5.6" width="11" height="5.3" rx="1.2"/><path d="M19.2 6.8v3a1.3 1.3 0 0 0 0-3z" opacity=".5"/></symbol>
+  <symbol id="s-cc" viewBox="0 0 16 16"><rect x="1.5" y="3" width="13" height="4" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="12.5" cy="5" r="1.4"/><rect x="1.5" y="9" width="13" height="4" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="3.5" cy="11" r="1.4"/></symbol>
+</svg>
+
+<div class="screen" id="screen">
+  <div class="bar">
+    <span class="m" style="font-size:15px"></span><span class="m b">备忘录</span><span class="m">文件</span><span class="m">编辑</span><span class="m">格式</span><span class="m">显示</span><span class="m">窗口</span><span class="m">帮助</span>
+    <span class="sp"></span>
+    <span class="st open" id="trayBtn"><svg class="tray" id="trayIcon"><use href="#tray"/></svg><span class="tray-badge" id="trayBadge" hidden></span></span>
+    <span class="st"><svg class="sys"><use href="#s-wifi"/></svg></span>
+    <span class="st"><svg class="sys" style="width:22px"><use href="#s-bat"/></svg></span>
+    <span class="st"><svg class="sys"><use href="#s-cc"/></svg></span>
+    <span class="clock">11月7日 周六 14:32</span>
+  </div>
+  <div class="win">
+    <div class="tb"><i></i><i></i><i></i><span>周会记录</span></div>
+    <div class="body" id="winBody"></div>
+  </div>
+  <div id="browser"></div>
+  <div id="pop"></div>
+  <div id="dlg"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const root = document.documentElement;
+const ME = { name: 'Eric Wang', email: 'eric@onlyquant.top' };
+const MAC = 'Eric 的 MacBook Pro';
+const HOST = 'tingxie.onlyquant.top';
+const RECENT = [
+  { t: '帮我把周五的会议改到下午三点，顺便通知一下设计组的同事。', at: '14:32' },
+  { t: '下周二之前把发布说明整理出来，重点写更新方式的变化。', at: '14:05' },
+  { t: '好的，收到。', at: '昨天' },
+];
+
+/*
+ * 菜单栏图标：on 正常；dim 变淡（未登录、没连上）；badge 右上角橙点（缺少辅助功能权限）。
+ * 菜单内容由状态决定，见 menu()。
+ */
+const S = {
+  connected: { tray: 'on', label: '已连接', dot: 'ok' },
+  empty: { tray: 'on', label: '已连接', dot: 'ok', recent: [] },
+  connecting: { tray: 'dim', label: '正在连接…', dot: 'wait' },
+  offline: { tray: 'dim', label: '连不上服务器，正在重试', dot: 'bad' },
+  permission: { tray: 'badge', label: '已连接', dot: 'ok', needPerm: true },
+  update: { tray: 'on', label: '已连接', dot: 'ok', update: '0.8.0' },
+  'logged-out': { tray: 'dim', loggedOut: true },
+  'logging-in': { tray: 'dim', loggedOut: true, busy: true },
+  expired: { tray: 'dim', loggedOut: true, msg: '登录已失效，请重新登录' },
+};
+
+const ic = (id, cls = 'icon ic') => `<svg class="${cls}"><use href="#${id}"/></svg>`;
+const tick = `${ic('i-check', 'icon tick')}`;
+const logo = '<svg class="logo" viewBox="0 1 398 383"><use href="#logo"/></svg>';
+
+function menu(s) {
+  const tail = (s.update ? `<div class="it">有新版本 ${s.update}…</div>` : '') + `<div class="it">退出听·写<span class="k">⌘Q</span></div>`;
+  let h = '';
+  if (s.loggedOut) {
+    h += `<div class="it off">${s.msg || '未登录'}</div><div class="sep"></div>`;
+    h += s.busy ? `<div class="it off">${ic('i-loader', 'icon ic spin')}正在浏览器中登录…</div><div class="it">取消登录</div>` : `<div class="it">登录…</div>`;
+    h += `<div class="it">服务器：${HOST}…</div><div class="sep"></div>`;
+    h += `<div class="it">${tick}开机时启动</div><div class="sep"></div>${tail}`;
+    return `<div class="menu">${h}</div>`;
+  }
+  const recent = s.recent || RECENT;
+  h += `<div class="it off"><span class="lead ${s.dot}"></span>${s.label}</div>`;
+  h += `<div class="it off">这台 Mac：${MAC}</div><div class="sep"></div>`;
+  if (s.needPerm) h += `<div class="it warn">${ic('i-alert')}开启辅助功能权限才能插入文字…</div><div class="sep"></div>`;
+  h += `<div class="hd">最近插入（点击复制）</div>`;
+  h += recent.length ? recent.map((r) => `<div class="it"><span class="txt">${r.t}</span><span class="k">${r.at}</span></div>`).join('')
+    : `<div class="it off">还没有收到文字</div>`;
+  h += `<div class="sep"></div><div class="it">${tick}开机时启动</div><div class="sep"></div>`;
+  h += `<div class="it off">${ME.name}（${ME.email}）</div><div class="it">退出登录…</div><div class="sep"></div>${tail}`;
+  return `<div class="menu">${h}</div>`;
+}
+
+// 系统对话框：kind 决定内容
+const DLG = {
+  server: () => `<h3>服务器地址</h3><p>局域网开发服务可以填 http://IP:端口</p><input value="https://${HOST}"><div class="a-btns row"><button>取消</button><button class="def">保存</button></div>`,
+  'server-error': () => `<h3>服务器地址</h3><p>局域网开发服务可以填 http://IP:端口</p><input value="https://tingxie.example"><div class="a-err">连不上这个服务器</div><div class="a-btns row"><button>取消</button><button class="def">保存</button></div>`,
+  logout: () => `<h3>退出登录？</h3><p>退出后这台 Mac 不再接收安卓端发送的文字。</p><div class="a-btns row"><button>取消</button><button class="def">退出登录</button></div>`,
+  'perm-prompt': () => `<h3>“听·写”想使用辅助功能控制这台电脑。</h3><p>在“隐私与安全性”设置中为此应用授予访问权限。</p><div class="a-btns"><button class="def">打开系统设置</button><button>拒绝</button></div>`,
+};
+
+// 浏览器里的登录回调页：确认页跳回 127.0.0.1，由客户端自己返回这个页面
+const CB = {
+  'callback-ok': ['ok', 'i-check', '已登录', '可以关闭这个页面，回到听·写'],
+  'callback-denied': ['', 'i-x', '已取消登录', '可以关闭这个页面'],
+  'callback-error': ['', 'i-x', '登录失败', '请回到听·写重新登录'],
+};
+
+function render(state) {
+  const s = S[state] || S.connected;
+  $('trayIcon').classList.toggle('dim', s.tray === 'dim');
+  $('trayBadge').hidden = s.tray !== 'badge';
+  const inserted = state === 'inserted';
+  $('winBody').innerHTML = `<p>本周进度：登录和推送已经联调完。</p><p>待办：${inserted ? `<span class="ins">${RECENT[0].t}</span>` : ''}<span class="caret"></span></p>`;
+  const open = !inserted && !DLG[state] && !CB[state];
+  $('trayBtn').classList.toggle('open', open);
+  if (open) {
+    $('pop').innerHTML = menu(s);
+    const pop = $('pop').firstElementChild;
+    const scr = $('screen').getBoundingClientRect(), b = $('trayBtn').getBoundingClientRect();
+    pop.style.left = Math.min(b.left - scr.left, scr.width - pop.offsetWidth - 8) + 'px';
+  }
+  if (DLG[state]) $('dlg').innerHTML = `<div class="dim-bg"><div class="alert"><div class="a-icon">${logo}</div>${DLG[state]()}</div></div>`;
+  if (CB[state]) {
+    const [cls, icon, title, msg] = CB[state];
+    $('browser').innerHTML = `<div class="browser"><div class="b-tb"><i></i><i></i><i></i><span class="url">127.0.0.1</span></div><div class="page"><main class="cb-card">
+      <div class="cb-brand"><div class="brand-mark">${logo}</div><div class="brand-name"><span>听</span><span class="brand-dot"></span><span>写</span></div></div>
+      <section class="result"><div class="mark ${cls}">${ic(icon, 'icon')}</div><h1>${title}</h1><p>${msg}</p></section></main></div></div>`;
+  }
+}
+
+// 直接打开某个状态：mac.html#<状态>，暗色加 dark- 前缀
+const GROUPS = [
+  ['菜单', [['已连接', 'connected'], ['没有记录', 'empty'], ['正在连接', 'connecting'], ['连不上服务器', 'offline'], ['缺少辅助功能权限', 'permission'], ['有新版本', 'update'], ['刚插入文字（菜单关闭）', 'inserted']]],
+  ['登录', [['未登录', 'logged-out'], ['正在浏览器中登录', 'logging-in'], ['登录已失效', 'expired'], ['回调页：已登录', 'callback-ok'], ['回调页：已取消', 'callback-denied'], ['回调页：登录失败', 'callback-error'], ['改服务器', 'server'], ['服务器连不上', 'server-error'], ['退出登录', 'logout']]],
+  ['系统', [['辅助功能权限提示', 'perm-prompt']]],
+];
+const dark = location.hash.slice(1).startsWith('dark');
+const state = location.hash.slice(1).replace(/^dark-?/, '') || 'connected';
+if (dark) root.dataset.theme = 'dark';
+render(state);
+addEventListener('hashchange', () => location.reload());
+
+if (!navigator.webdriver) {
+  const go = (st, d) => { location.hash = [d ? 'dark' : '', st].filter(Boolean).join('-') || '_'; };
+  const btn = document.createElement('button'); btn.className = 'states-btn'; btn.innerHTML = `${ic('i-more', 'icon')}状态`;
+  const menuEl = document.createElement('div'); menuEl.className = 'states'; menuEl.hidden = true;
+  const t = document.createElement('button'); t.className = 'toggle'; t.textContent = dark ? '暗色 ✓' : '暗色'; t.onclick = () => go(state, !dark); menuEl.append(t);
+  for (const [name, items] of GROUPS) {
+    const h = document.createElement('h4'); h.textContent = name; menuEl.append(h);
+    for (const [label, st] of items) {
+      const b = document.createElement('button'); b.innerHTML = `${label}<code>#${st}</code>`;
+      if (st === state) b.setAttribute('aria-current', 'true');
+      b.onclick = () => go(st, dark); menuEl.append(b);
+    }
+  }
+  btn.onclick = (e) => { e.stopPropagation(); menuEl.hidden = !menuEl.hidden; };
+  menuEl.onclick = (e) => e.stopPropagation();
+  document.addEventListener('click', () => { menuEl.hidden = true; });
+  document.body.append(btn, menuEl);
+}
+</script>
+</body>
+</html>

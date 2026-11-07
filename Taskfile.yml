@@ -37,6 +37,12 @@ tasks:
     cmds:
       - ./scripts/build.sh
 
+  build:mac:
+    desc: Build the Mac menu bar app (mac/build/TingXie.app; VERSION, MAC_SIGN_IDENTITY, UNIVERSAL=1)
+    platforms: [darwin]
+    cmds:
+      - ./mac/scripts/bundle.sh
+
   build:frontend:
     desc: Build the frontend static dist
     dir: frontend
@@ -95,11 +101,19 @@ tasks:
     cmds:
       - task: lint
       - task: test:go
+      - task: test:mac
 
   test:go:
     desc: Run Go unit and HTTP tests
     cmds:
       - go test ./...
+
+  test:mac:
+    desc: Run the Mac client's unit tests
+    platforms: [darwin]
+    dir: mac
+    cmds:
+      - swift test
 
   ###################################################
   ################ Container Tests ##################
@@ -119,6 +133,13 @@ tasks:
     dir: frontend
     cmds:
       - npm run dev
+
+  run:mac:
+    desc: Build and open the Mac menu bar app
+    platforms: [darwin]
+    cmds:
+      - ./mac/scripts/bundle.sh
+      - open mac/build/TingXie.app
 
   run:server:
     desc: Run the ASR server with config.yaml in the project root

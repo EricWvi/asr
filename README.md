@@ -1,6 +1,6 @@
 # 听写
 
-用语音记笔记的 ASR 服务：在浏览器里按住说话，转写结果插入文稿光标处，可以再用大模型（默认 DeepSeek，任何 OpenAI 兼容接口都行）把口语稿整理成规范的书面 Markdown。安卓客户端还能把转写结果直接发送到 Mac 的光标处（规划中）。
+用语音记笔记的 ASR 服务：在浏览器里按住说话，转写结果插入文稿光标处，可以再用大模型（默认 DeepSeek，任何 OpenAI 兼容接口都行）把口语稿整理成规范的书面 Markdown。安卓客户端还能把转写结果直接发送到 Mac 的光标处。
 
 单个 Go 进程同时提供页面和 API，前端资源通过 `go:embed` 打进可执行文件，运行时不需要 Node.js。登录走 OIDC（Authelia），多用户数据隔离。
 
@@ -38,6 +38,17 @@ cd android && ./gradlew installDebug   # 装到已连接的手机或模拟器
 ```
 
 debug 包允许明文 HTTP：登录页点服务器地址，改成 `http://<电脑的局域网 IP>:36750` 就能连本地开发服务（模拟器里用 `http://10.0.2.2:36750`）。
+
+### Mac 客户端
+
+菜单栏应用（Swift Package）在 [mac/](mac/)，需要 Xcode（命令行构建也要）：
+
+```sh
+task run:mac    # 打包 mac/build/TingXie.app 并打开
+task test:mac   # 单元测试
+```
+
+插入文字要在「系统设置 → 隐私与安全性 → 辅助功能」里给「听·写」授权。授权绑定签名证书，所以每次都用同一个证书签名：钥匙串里有「TingXie Code Signing」时打包脚本默认用它，否则是 ad-hoc 签名，每次重新编译都要重新授权。连本地开发服务：`defaults write top.onlyquant.tingxie.mac server http://127.0.0.1:36750`（未登录时菜单里也能改）。
 
 ## 测试
 
@@ -79,7 +90,7 @@ task build           # 产物：release/asr
 
 ## 发布
 
-推送 `v*` 标签（如 `v1.2.3`）后，GitHub Actions 构建 `linux/amd64`、`linux/arm64` 镜像并推送到 GHCR，标签为版本号和 `latest`；带 `-` 的预发布版本不更新 `latest`。也可以在 Actions 页面手动运行 release 工作流并填写版本号。
+推送 `v*` 标签（如 `v1.2.3`）后，GitHub Actions 构建 `linux/amd64` 镜像并推送到 GHCR，标签为版本号和 `latest`；带 `-` 的预发布版本不更新 `latest`。也可以在 Actions 页面手动运行 release 工作流并填写版本号。
 
 同一个工作流还会构建安卓 APK，和 `latest.json` 一起附到 GitHub Release，安卓端据此更新。签名用的 secrets 是 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`；证书指纹写在工作流里，不符就中止发布。签名密钥一旦丢失，已安装的 app 就无法覆盖升级。
 
