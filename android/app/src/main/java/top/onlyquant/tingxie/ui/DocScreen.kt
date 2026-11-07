@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -94,6 +96,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import top.onlyquant.tingxie.data.shortTime
 import top.onlyquant.tingxie.data.userMessage
 import top.onlyquant.tingxie.ui.theme.TintNames
@@ -160,7 +163,16 @@ private data class Tap(val start: Int, val end: Int, val blockY: Float, val x: F
 
 private data class Block(val start: Int, val end: Int, val y: Float)
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/** Leaving edit mode: the text at [offset] stays where it is on screen once rendered. */
+private data class Exit(val offset: Int, val layout: TextLayoutResult, val scrollY: Int, val height: Int)
+
+/** While the view changes, only the code that places the text may scroll. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private object NoAutoScroll : androidx.compose.foundation.gestures.BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = 0f
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc: Doc, route: Route.Doc) {
     val p = Tokens.palette
@@ -201,12 +213,25 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
     var value by remember(doc.id) { mutableStateOf(TextFieldValue(doc.content, TextRange(doc.content.length))) }
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     var tap by remember { mutableStateOf<Tap?>(null) }
+    var exit by remember(doc.id) { mutableStateOf<Exit?>(null) }
+    // The text is hidden for the moment between swapping views and placing it.
+    var placing by remember(doc.id) { mutableStateOf(false) }
+    var settling by remember(doc.id) { mutableStateOf(false) }
+    var bodyHeight by remember(doc.id) { mutableStateOf(0) }
+    val ime = WindowInsets.ime
+    val imeTarget = androidx.compose.foundation.layout.WindowInsets.imeAnimationTarget
+    val navBar = WindowInsets.navigationBars
+    val bringIntoView = androidx.compose.foundation.gestures.LocalBringIntoViewSpec.current
     val bodyFocus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val hl = remember(p, t) { Highlight(p, t) }
     if (!m.online && editing) {
         editing = false
         title = null
+        tap = null
+        layout = null
+        placing = false
+        settling = false
     }
     // Text written from elsewhere (dictation, a task box) reaches the editor.
     if (doc.content != value.text) {
@@ -223,6 +248,22 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
 
     fun finishEditing() {
         commitTitle()
+        val l = layout
+        if (editing && l != null) {
+            // Keep the caret's text in place, or the top line if the caret is out of sight.
+            val len = l.layoutInput.text.length
+            val caret = value.selection.max.coerceIn(0, len)
+            val line = l.getLineForOffset(caret)
+            val viewTop = scroll.value - bodyTop
+            val seen = l.getLineTop(line) >= viewTop && l.getLineBottom(line) <= viewTop + scroll.viewportSize
+            val offset = if (seen) caret else l.getOffsetForPosition(Offset(0f, viewTop.coerceAtLeast(0f)))
+            blocks.clear()
+            exit = Exit(offset, l, scroll.value, bodyHeight)
+            placing = true
+        }
+        layout = null
+        tap = null
+        settling = false
         editing = false
         focusManager.clearFocus()
         scope.launch { lib.flush(doc.id) }
@@ -231,8 +272,36 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
     fun startEditing(at: Int?) {
         if (!m.online) return
         commitTitle()
+        settling = true
         editing = true
         if (at != null) value = value.copy(selection = TextRange(at))
+    }
+
+    /**
+     * Scrolls once, as the keyboard comes up, to [base], or as far from it as
+     * it takes to keep the caret's line clear of the keyboard, then hands
+     * scrolling back to the text field.
+     */
+    suspend fun placeCaret(base: Int) {
+        val l = androidx.compose.runtime.snapshotFlow { layout }.first { it != null }!!
+        // How tall the text area will be is known as soon as the keyboard starts to rise.
+        withTimeoutOrNull(600) { androidx.compose.runtime.snapshotFlow { imeTarget.getBottom(density) }.first { it > 0 } }
+        val nav = navBar.getBottom(density)
+        val viewport = scroll.viewportSize - (maxOf(imeTarget.getBottom(density), nav) - maxOf(ime.getBottom(density), nav))
+        val line = l.getLineForOffset(value.selection.max.coerceIn(0, l.layoutInput.text.length))
+        val margin = with(density) { 24.dp.toPx() }
+        val top = bodyTop + l.getLineTop(line) - margin
+        val bottom = bodyTop + l.getLineBottom(line) + margin
+        val to = when {
+            bottom > base + viewport -> (bottom - viewport).toInt()
+            top < base -> top.toInt().coerceAtLeast(0)
+            else -> base
+        }
+        if (scroll.value != to) scroll.animateScrollTo(to)
+        // The scroll range only reaches its full length with the keyboard up.
+        withTimeoutOrNull(600) { androidx.compose.runtime.snapshotFlow { ime.getBottom(density) == imeTarget.getBottom(density) }.first { it } }
+        if (scroll.value != to) scroll.animateScrollTo(to)
+        settling = false
     }
 
     fun onEdit(next: TextFieldValue) {
@@ -270,16 +339,34 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
         value = value.copy(selection = TextRange(off))
         val target = (scroll.value + top - tp.blockY).toInt()
         scroll.scrollTo(target)
+        placing = false
         bodyFocus.requestFocus()
-        // Focusing scrolls the field on its own while the keyboard comes up;
-        // put the tapped block back where it was.
-        delay(450)
-        scroll.animateScrollTo(target)
+        placeCaret(target)
         // Last: clearing the key cancels this effect.
         tap = null
     }
     LaunchedEffect(editing, title == null) {
-        if (editing && title == null && tap == null) bodyFocus.requestFocus()
+        if (editing && title == null && tap == null) {
+            bodyFocus.requestFocus()
+            placeCaret(scroll.value)
+        }
+    }
+
+    // Back in view mode: wait for the text to be rendered (the height stays
+    // meanwhile, or the scroll position is lost), then line it up with where it was.
+    LaunchedEffect(exit) {
+        val e = exit ?: return@LaunchedEffect
+        if (doc.content.isNotBlank()) {
+            withTimeoutOrNull(1500) { androidx.compose.runtime.snapshotFlow { blocks.size }.first { it > 0 } }
+            androidx.compose.runtime.withFrameNanos { }
+            blocks.values.filter { it.start <= e.offset }.maxByOrNull { it.start }?.let { b ->
+                val start = b.start.coerceIn(0, e.layout.layoutInput.text.length)
+                scroll.scrollTo((e.scrollY + b.y - e.layout.getLineTop(e.layout.getLineForOffset(start))).toInt())
+            }
+        }
+        placing = false
+        // Last: clearing the key cancels this effect.
+        exit = null
     }
 
     // View mode dictates at the end: keep it in sight.
@@ -299,6 +386,7 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
     // From a search result: scroll the first block with a hit into the middle.
     if (route.hits.isNotEmpty()) {
         LaunchedEffect(doc.id, blocks.size) {
+            if (editing || exit != null) return@LaunchedEffect
             val lower = doc.content.lowercase()
             val first = route.hits.minOfOrNull { w -> lower.indexOf(w.lowercase()).let { if (it < 0) Int.MAX_VALUE else it } } ?: return@LaunchedEffect
             val y = blocks.values.filter { it.start <= first }.maxByOrNull { it.start }?.y ?: return@LaunchedEffect
@@ -332,15 +420,20 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
             }
         }
         if (!m.online) OfflineBar()
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides if (settling) NoAutoScroll else bringIntoView,
+        ) {
         Column(Modifier.weight(1f).verticalScroll(scroll)) {
             Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp)) {
                 TitleField(doc, title, onChange = { title = it }, onStart = {
                     if (m.online) {
                         startEditing(null)
+                        settling = false
                         title = TextFieldValue(doc.title, TextRange(doc.title.length))
                     }
                 }, onEnter = {
                     commitTitle()
+                    settling = true
                     value = value.copy(selection = TextRange(0))
                     bodyFocus.requestFocus()
                 })
@@ -356,8 +449,13 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .onGloballyPositioned { bodyTop = it.positionInParent().y + with(density) { 22.dp.toPx() } }
-                    .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = if (editing) 40.dp else 200.dp)
+                    .heightIn(min = with(density) { (exit?.height ?: 0).toDp() })
+                    .onGloballyPositioned {
+                        bodyTop = it.positionInParent().y + with(density) { 22.dp.toPx() }
+                        bodyHeight = it.size.height
+                    }
+                    .graphicsLayer { alpha = if (placing) 0f else 1f }
+                    .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 200.dp)
                     .then(if (sweep != null) Modifier.drawWithContent { shimmer.at(sweep.value); drawContent() } else Modifier),
             ) {
                 if (editing) {
@@ -375,6 +473,7 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
                             if (!m.online) return@detectTapGestures
                             val b = blocks.values.filter { it.y <= o.y }.maxByOrNull { it.y }
                             tap = if (b == null) null else Tap(b.start, b.end, b.y, o.x, o.y - b.y)
+                            placing = b != null
                             startEditing(if (b == null) doc.content.length else null)
                         }
                     }
@@ -392,6 +491,7 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
                     }
                 }
             }
+        }
         }
         if (editing && m.online) Tools(m, doc, talk, onHide = { finishEditing() })
     }
@@ -495,6 +595,8 @@ private fun Editor(
     )
 }
 
+private val TOOL_SIDE = 92.dp
+
 /** Above the keyboard while editing: 整理, 按住说话 (at the cursor), hide the keyboard. */
 @Composable
 private fun Tools(m: AppModel, doc: Doc, talk: DocDictation, onHide: () -> Unit) {
@@ -512,17 +614,22 @@ private fun Tools(m: AppModel, doc: Doc, talk: DocDictation, onHide: () -> Unit)
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(
-            Modifier.height(44.dp).pressable(CircleShape) { tapTidy(m, doc, talk) }.dim(!pending && !tidying).padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (tidying) Spinner(p.ink2, 18.dp) else Ico(Icons.Sparkle, p.ink2, 18.dp)
-            Text(if (tidying) "整理中" else "整理", color = p.ink2, fontSize = 14.sp)
+        // Both sides are as wide as 「整理中」, which keeps the talk button in the middle.
+        Box(Modifier.width(TOOL_SIDE), contentAlignment = Alignment.CenterStart) {
+            Row(
+                Modifier.height(44.dp).pressable(CircleShape) { tapTidy(m, doc, talk) }.dim(!pending && !tidying).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (tidying) Spinner(p.ink2, 18.dp) else Ico(Icons.Sparkle, p.ink2, 18.dp)
+                Text(if (tidying) "整理中" else "整理", color = p.ink2, fontSize = 14.sp)
+            }
         }
         HoldButton(m, talk, Modifier.weight(1f).height(42.dp), fontSize = 15.sp, glow = 4.dp, shadow = false, off = tidying)
-        Box(Modifier.size(44.dp).pressable(CircleShape, onClick = onHide), contentAlignment = Alignment.Center) {
-            Ico(Icons.KbHide, p.ink2)
+        Box(Modifier.width(TOOL_SIDE), contentAlignment = Alignment.CenterEnd) {
+            Box(Modifier.size(44.dp).pressable(CircleShape, onClick = onHide), contentAlignment = Alignment.Center) {
+                Ico(Icons.KbHide, p.ink2)
+            }
         }
     }
 }
@@ -540,7 +647,8 @@ private fun tapTidy(m: AppModel, doc: Doc, talk: DocDictation) {
 
 /** Flips "[ ]" and "[x]" at the given offset of the source. */
 private fun toggleTask(m: AppModel, doc: Doc, at: Int) {
-    val c = doc.content
+    // The renderer keeps its first callback, so [doc] may be old: edit what is there now.
+    val c = m.library.doc(doc.id)?.content ?: return
     if (at + 1 >= c.length || c[at] != '[') return
     val now = if (c[at + 1] == ' ') 'x' else ' '
     m.library.edit(doc.id, DocPatch(content = c.substring(0, at + 1) + now + c.substring(at + 2)))

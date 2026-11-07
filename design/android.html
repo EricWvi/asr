@@ -424,12 +424,12 @@ svg { display: block; }
   flex: none; height: 56px; padding: 0 8px; display: flex; align-items: center; gap: 6px;
   background: var(--surface); box-shadow: 0 -1px 0 var(--line);
 }
-.tools .tool { height: 44px; padding: 0 12px; border-radius: 22px; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-2); }
+.tools .tool { width: 92px; flex: none; height: 44px; padding: 0 12px; border-radius: 22px; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-2); }
 .tools .tool:active { background: var(--selected); }
 .tools .tool.disabled { opacity: .45; }
 .tools .hold { height: 42px; font-size: 15px; box-shadow: none; }
 .tools .hold.rec { box-shadow: 0 0 0 4px color-mix(in oklch, var(--rec) 18%, transparent); }
-.tools .icon-btn { width: 44px; height: 44px; }
+.tools .icon-btn { width: 44px; height: 44px; margin-left: 48px; flex: none; }
 
 /* 落选变体：单个圆形麦克风按钮，整理挪到顶栏（#doc-fab） */
 .mic-fab {

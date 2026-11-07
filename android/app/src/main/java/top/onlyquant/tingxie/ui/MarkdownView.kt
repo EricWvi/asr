@@ -68,6 +68,7 @@ import com.mikepenz.markdown.model.markdownAnnotatorConfig
 import com.mikepenz.markdown.model.markdownExtendedSpans
 import com.mikepenz.markdown.compose.extendedspans.ExtendedSpans
 import com.mikepenz.markdown.model.markdownPadding
+import com.mikepenz.markdown.model.rememberMarkdownState
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.ASTNode
@@ -189,10 +190,9 @@ fun MarkdownView(
     val transformer = remember(server) { RelativeImages(server) }
     val components = remember(tint, p, server) { components(tint, server, onToggle) }
 
+    // While new text parses the old stays up, so the height and scroll position survive.
     Markdown(
-        content = content,
-        flavour = flavour,
-        parser = parser,
+        markdownState = rememberMarkdownState(content, flavour = flavour, parser = parser, retainState = true),
         colors = colors,
         typography = typography,
         padding = markdownPadding(block = 0.dp, list = 0.dp, listItemTop = 2.dp, listItemBottom = 2.dp, listIndent = 0.dp),
