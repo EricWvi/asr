@@ -29,7 +29,17 @@ import (
  *                    {"type":"ack","id":"…","error":"…"}  the insert with
  *                    this id is done; error is set, in Chinese, if the
  *                    Mac could not insert it
- *   server → client  {"type":"insert","id":"…","text":"…"}
+ *   server → client  {"type":"hello","now":…}  sent once on connect;
+ *                    now is the server's clock in Unix milliseconds
+ *                    {"type":"insert","id":"…","text":"…","deadline":…}
+ *
+ * The server waits AckTimeout for an ack and then tells the sender the Mac
+ * did not respond. A Mac that was stalled (asleep, frozen, its main thread
+ * busy) may only get to the insert later; inserting it then would surprise
+ * the sender, who may well send it again. So each insert carries a
+ * deadline in server time, a fifth of AckTimeout before the server gives
+ * up, and the Mac drops an insert it reaches past the deadline. The Mac
+ * converts the deadline with the clock offset it measured from hello.
  *
  * The server pings every PingInterval; a connection that does not answer
  * within PingTimeout is dropped. A second connection for the same device
@@ -91,15 +101,26 @@ type Status struct {
 }
 
 type message struct {
-	Type  string `json:"type"`
-	ID    string `json:"id,omitempty"`
-	Text  string `json:"text,omitempty"`
-	Error string `json:"error,omitempty"`
+	Type     string `json:"type"`
+	ID       string `json:"id,omitempty"`
+	Text     string `json:"text,omitempty"`
+	Error    string `json:"error,omitempty"`
+	Now      int64  `json:"now,omitempty"`
+	Deadline int64  `json:"deadline,omitempty"`
 }
 
 // Serve runs the connection of a device until it closes or ctx ends.
 func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, d store.Device) {
 	conn.SetReadLimit(4 << 10)
+	// Before the connection is registered, so no insert can overtake it.
+	hello, _ := json.Marshal(message{Type: "hello", Now: time.Now().UnixMilli()})
+	wctx, wcancel := context.WithTimeout(ctx, h.PingTimeout)
+	err := conn.Write(wctx, websocket.MessageText, hello)
+	wcancel()
+	if err != nil {
+		conn.CloseNow()
+		return
+	}
 	c := &client{conn: conn, device: d, connectedAt: time.Now(), acks: map[string]chan string{}, gone: make(chan struct{})}
 	h.mu.Lock()
 	devices := h.users[d.UserID]
@@ -230,7 +251,8 @@ func (h *Hub) Send(ctx context.Context, userID, deviceID int64, text string) (st
 	// follow the caller's context.
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), h.AckTimeout)
 	defer cancel()
-	data, _ := json.Marshal(message{Type: "insert", ID: id, Text: text})
+	deadline := time.Now().Add(h.AckTimeout - h.AckTimeout/5)
+	data, _ := json.Marshal(message{Type: "insert", ID: id, Text: text, Deadline: deadline.UnixMilli()})
 	if err := c.conn.Write(wctx, websocket.MessageText, data); err != nil {
 		return store.Device{}, ErrGone
 	}

@@ -77,9 +77,12 @@ func (dt *deviceTest) list(t *testing.T) []map[string]any {
 // fakeMac connects like the Mac client and answers inserts with reply.
 type fakeMac struct {
 	conn  *websocket.Conn
+	hello chan int64 // the server's clock, from the hello message
 	texts chan string
-	reply func(text string) string // returns the error to report, or ""
-	mute  bool                     // never acknowledge
+	// deadlines receives each insert's deadline, in server milliseconds.
+	deadlines chan int64
+	reply     func(text string) string // returns the error to report, or ""
+	mute      bool                     // never acknowledge
 }
 
 func (dt *deviceTest) connect(t *testing.T, token string, reply func(string) string) *fakeMac {
@@ -95,7 +98,7 @@ func (dt *deviceTest) connect(t *testing.T, token string, reply func(string) str
 		t.Fatalf("dial: %v (status %d)", err, code)
 	}
 	t.Cleanup(func() { conn.CloseNow() })
-	m := &fakeMac{conn: conn, texts: make(chan string, 8), reply: reply}
+	m := &fakeMac{conn: conn, hello: make(chan int64, 1), texts: make(chan string, 8), deadlines: make(chan int64, 8), reply: reply}
 	go func() {
 		for {
 			_, data, err := conn.Read(ctx)
@@ -103,9 +106,17 @@ func (dt *deviceTest) connect(t *testing.T, token string, reply func(string) str
 				close(m.texts)
 				return
 			}
-			var msg struct{ Type, ID, Text string }
+			var msg struct {
+				Type, ID, Text string
+				Now, Deadline  int64
+			}
 			json.Unmarshal(data, &msg)
+			if msg.Type == "hello" {
+				m.hello <- msg.Now
+				continue
+			}
 			m.texts <- msg.Text
+			m.deadlines <- msg.Deadline
 			if m.reply == nil {
 				continue
 			}
@@ -200,6 +211,36 @@ func TestSendGoesToMostRecentlyActiveMac(t *testing.T) {
 	// The browser can send too; empty text is rejected.
 	if code, _ := dt.call(t, "POST", "/api/send", "", `{"text":"  "}`); code != http.StatusBadRequest {
 		t.Fatalf("empty text: %d", code)
+	}
+}
+
+// The Mac learns the server's clock on connect, and every insert carries
+// a deadline that ends before the server gives up on the ack, so a Mac
+// that wakes up late drops the text instead of inserting it after the
+// sender was told it failed.
+func TestInsertCarriesDeadline(t *testing.T) {
+	dt := newDeviceTest(t)
+	mac, macToken := dt.device(t, "Air", store.PlatformMac)
+	m := dt.connect(t, macToken, ok)
+	select {
+	case now := <-m.hello:
+		if d := time.Since(time.UnixMilli(now)); d < -time.Second || d > time.Second {
+			t.Fatalf("hello clock off by %v", d)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no hello")
+	}
+	waitFor(t, "online", func() bool { return online(dt, t, mac.ID) })
+
+	sent := time.Now()
+	if code, out := dt.call(t, "POST", "/api/send", "", `{"text":"x"}`); code != http.StatusOK {
+		t.Fatalf("send: %d %v", code, out)
+	}
+	<-m.texts
+	deadline := time.UnixMilli(<-m.deadlines)
+	ackTimeout := 300 * time.Millisecond // newDeviceTest
+	if !deadline.After(sent) || !deadline.Before(sent.Add(ackTimeout)) {
+		t.Fatalf("deadline %v after send, want within the ack timeout %v", deadline.Sub(sent), ackTimeout)
 	}
 }
 
