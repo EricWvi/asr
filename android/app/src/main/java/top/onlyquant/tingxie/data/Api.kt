@@ -118,8 +118,14 @@ suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
     cont.invokeOnCancellation { cancel() }
 }
 
-/** Reads the body, or throws ApiError with the server's message. */
-private fun Response.text(): String = use {
+/**
+ * Reads the body, or throws ApiError with the server's message. A body
+ * larger than what OkHttp has buffered is read from the socket, which
+ * Android forbids on the main thread, so it is read on the IO dispatcher.
+ */
+private suspend fun Response.text(): String = withContext(Dispatchers.IO) { readText() }
+
+private fun Response.readText(): String = use {
     val body = it.body.string()
     if (!it.isSuccessful) {
         val msg = runCatching { json.decodeFromString<ErrorBody>(body).error }.getOrNull()

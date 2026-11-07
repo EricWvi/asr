@@ -84,7 +84,11 @@ class Sends(private val api: Api, private val file: File, private val prefs: Pre
             val saved = withContext(Dispatchers.IO) {
                 runCatching { json.decodeFromString<List<SendRecord>>(file.readText()) }.getOrNull()
             }
-            if (saved != null) records.addAll(0, saved.restored().recent(System.currentTimeMillis()))
+            if (saved != null) {
+                val kept = saved.restored().recent(System.currentTimeMillis())
+                records.addAll(0, kept)
+                if (kept.size < saved.size) save()
+            }
         }
     }
 
