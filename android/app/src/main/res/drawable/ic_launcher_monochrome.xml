@@ -5,7 +5,7 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group android:scaleX="0.10050" android:scaleY="0.10050" android:translateX="34.000" android:translateY="34.653">
+    <group android:scaleX="0.13568" android:scaleY="0.13568" android:translateX="27.018" android:translateY="27.883">
         <path android:fillColor="#FF000000" android:pathData="M0.0 123.5A58.5 58.5 0 0 1 35.3 69.8L186.1 4.6A45.8 45.8 0 0 1 250.0 46.6L250.0 334.3A49.8 49.8 0 0 1 183.5 381.2L36.5 328.6A55.0 55.0 0 0 1 0.0 276.8Z" />
         <path android:fillColor="#FF000000" android:pathData="M264.8 48.8A9.8 9.8 0 0 1 274.5 39.0L281.0 39.0A46.0 46.0 0 0 1 327.0 85.0L327.0 298.8A46.0 46.0 0 0 1 281.0 344.8L274.5 344.8A9.8 9.8 0 0 1 264.8 335.0Z" />
         <path android:fillColor="#FF000000" android:pathData="M341.8 87.0A8.2 8.2 0 0 1 350.0 78.8L355.2 78.8A42.5 42.5 0 0 1 397.8 121.2L397.8 259.8A42.5 42.5 0 0 1 355.2 302.2L350.0 302.2A8.2 8.2 0 0 1 341.8 294.0Z" />
