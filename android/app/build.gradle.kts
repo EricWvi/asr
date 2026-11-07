@@ -4,6 +4,17 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// The release tag sets the version: -PappVersion=1.2.3. 1.2.3 is code 1002003, so codes
+// grow with versions; a pre-release shares its code with the release it leads to.
+val appVersion = providers.gradleProperty("appVersion").getOrElse("0.1.0")
+val appVersionCode = appVersion.substringBefore('-').split('.').map(String::toInt)
+    .let { (major, minor, patch) -> major * 1_000_000 + minor * 1_000 + patch }
+val updateUrl = providers.gradleProperty("updateUrl")
+    .getOrElse("https://github.com/EricWvi/asr/releases/latest/download/latest.json")
+// Android only installs an update signed like the installed app, so CI always signs with
+// this key. Local release builds without it use the debug key.
+val keystore = providers.environmentVariable("ANDROID_KEYSTORE_FILE").orNull
+
 android {
     namespace = "top.onlyquant.tingxie"
     compileSdk = 37
@@ -12,8 +23,20 @@ android {
         applicationId = "top.onlyquant.tingxie"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersion
+        buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
+    }
+
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").get()
+                keyPassword = storePassword
+            }
+        }
     }
 
     buildTypes {
@@ -21,8 +44,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Self-installed APKs: sign release with the debug key until a real one exists.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 

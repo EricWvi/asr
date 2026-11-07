@@ -85,6 +85,13 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     )
     private var tidySnack: Long? = null
 
+    val updater = top.onlyquant.tingxie.data.Updater(
+        app, prefs, viewModelScope,
+        // The profile page has a card that says the same.
+        toast = { text, action, onAction, sticky -> if (stack.lastOrNull() != Route.Profile) snack = SnackMsg(text, action, onAction, sticky) },
+        withdraw = { if (snack?.sticky == true) snack = null },
+    )
+
     fun toast(text: String, action: String? = null, onAction: (() -> Unit)? = null) {
         snack = SnackMsg(text, action, onAction)
     }
@@ -170,6 +177,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
      */
     fun onResume() {
         if (api != null) {
+            if (online) updater.autoCheck()
             refresh()
             (stack.lastOrNull() as? Route.Doc)?.let { r ->
                 viewModelScope.launch { library.reload(r.id) { voice.phase == top.onlyquant.tingxie.voice.Phase.Idle && tidier.busyWith == null } }
@@ -199,6 +207,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         stack.clear()
         stack.add(Route.List)
         refresh()
+        if (online) updater.autoCheck()
         val last = prefs.lastDoc()
         if (last != null) {
             stack.add(Route.Doc(last))

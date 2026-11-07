@@ -26,6 +26,8 @@ class Prefs(private val context: Context) {
         val deviceId = longPreferencesKey("device_id")
         val lastDoc = longPreferencesKey("last_doc")
         val sendTarget = longPreferencesKey("send_target")
+        val updateCheckedAt = longPreferencesKey("update_checked_at")
+        val updatePrompted = stringPreferencesKey("update_prompted")
         val pendingState = stringPreferencesKey("pending_state")
         val pendingVerifier = stringPreferencesKey("pending_verifier")
         val pendingServer = stringPreferencesKey("pending_server")
@@ -67,6 +69,15 @@ class Prefs(private val context: Context) {
     suspend fun sendTarget(): Long = read()[K.sendTarget] ?: 0
 
     suspend fun setSendTarget(id: Long) = context.store.edit { it[K.sendTarget] = id }
+
+    suspend fun updateCheckedAt(): Long = read()[K.updateCheckedAt] ?: 0
+
+    suspend fun setUpdateCheckedAt(at: Long) = context.store.edit { it[K.updateCheckedAt] = at }
+
+    /** The version the snack bar has already announced. */
+    suspend fun updatePrompted(): String? = read()[K.updatePrompted]
+
+    suspend fun setUpdatePrompted(version: String) = context.store.edit { it[K.updatePrompted] = version }
 
     // The browser round trip may outlive the process, so the PKCE secrets
     // wait on disk.

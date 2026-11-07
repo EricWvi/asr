@@ -480,6 +480,17 @@ svg { display: block; }
 .profile-name { margin-top: 16px; font-size: 20px; font-weight: 600; }
 .profile-email { margin-top: 2px; font-size: 14.5px; color: var(--ink-2); }
 .profile-actions { display: flex; gap: 10px; margin-top: 24px; }
+/* 版本与更新：个人资料页底部 */
+.about { margin: auto 16px 52px; padding: 12px 12px 12px 16px; border-radius: 16px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.about-row { display: flex; align-items: center; gap: 12px; min-height: 42px; }
+.about-body { flex: 1; min-width: 0; }
+.about-name { font-size: 15.5px; }
+.about-sub { margin-top: 1px; font-size: 13px; color: var(--ink-2); }
+.about.failed .about-sub { color: var(--rec); }
+.about .btn.go { background: var(--accent); color: #fff; }
+.about .spinner { width: 14px; height: 14px; }
+.about-bar { height: 4px; margin: 10px 4px 2px 0; border-radius: 2px; background: var(--chip); overflow: hidden; }
+.about-bar i { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
 .btn { height: 42px; padding: 0 18px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; font-weight: 500; background: var(--chip); }
 .btn:active { background: var(--selected); }
 .btn.ghost { background: none; color: var(--ink-2); }
@@ -869,6 +880,7 @@ svg { display: block; }
         <button class="btn ghost" id="avatarRemove" hidden>移除头像</button>
       </div>
     </div>
+    <div class="about" id="about"></div>
   </section>
 
   <!-- 裁剪头像：选图后全屏裁剪，客户端裁成 256×256 编码成 WebP 再上传 -->
@@ -1368,6 +1380,24 @@ const syncAvatar = () => {
   for (const el of [$('meAvatar'), $('profileAvatar')]) el.innerHTML = avatar ? `<img src="${avatar}" alt="">` : 'E';
   $('avatarRemove').hidden = !avatar;
 };
+// 版本与更新：sub 是状态，btn 是右边的按钮；下载中多一条进度
+const ABOUT = {
+  idle: { btn: ['btn', '检查更新'] },
+  checking: { sub: '正在检查', btn: ['btn', '<span class="spinner"></span>检查中'] },
+  latest: { sub: '已是最新版本', btn: ['btn', '检查更新'] },
+  available: { sub: '有新版本 0.6.0', btn: ['btn go', '更新'] },
+  downloading: { sub: '正在下载 42%', btn: ['btn ghost', '取消'], bar: 42 },
+  ready: { sub: '已下载 0.6.0', btn: ['btn go', '安装'] },
+  'check-failed': { sub: '检查失败，请重试', btn: ['btn', '重试'], failed: true },
+  'download-failed': { sub: '下载失败，请重试', btn: ['btn', '重试'], failed: true },
+  'bad-file': { sub: '安装包校验失败，请重试', btn: ['btn', '重试'], failed: true },
+};
+const setAbout = (state) => {
+  const a = ABOUT[state];
+  $('about').className = 'about' + (a.failed ? ' failed' : '');
+  $('about').innerHTML = `<div class="about-row"><div class="about-body"><div class="about-name">听·写 0.5.1</div>${a.sub ? `<div class="about-sub">${a.sub}</div>` : ''}</div><button class="${a.btn[0]}">${a.btn[1]}</button></div>${a.bar ? `<div class="about-bar"><i style="width:${a.bar}%"></i></div>` : ''}`;
+};
+setAbout('idle');
 const openProfile = () => { show('profile'); syncAvatar(); };
 $('avatarRemove').onclick = () => { avatar = null; syncAvatar(); };
 // 选图用系统照片选择器；任何系统能解码的格式都行（含 HEIC），客户端裁好后编码成 WebP 上传
@@ -1485,6 +1515,10 @@ const STATES = {
   'send-net-off': () => { openSend(); $('sendOffline').hidden = false; $('hold3').parentElement.hidden = true; },
   profile: () => openProfile(),
   'profile-avatar': () => { avatar = samplePhoto; openProfile(); },
+  'update-snack': () => { openList(); snack('有新版本 0.6.0', '更新', () => {}); },
+  'update-snack-down': () => { openList(); snack('正在下载 42%', '取消', () => {}); },
+  'update-snack-fail': () => { openList(); snack('下载失败', '重试', () => {}); },
+  ...Object.fromEntries(Object.keys(ABOUT).map((k) => ['update-' + k, () => { openProfile(); setAbout(k); }])),
   'avatar-crop': () => startCrop(samplePhoto, () => zoomTo(1.3)),
   'avatar-saving': () => startCrop(samplePhoto, () => { zoomTo(1.3); savingCrop(); }),
   'avatar-error': () => startCrop(samplePhoto, () => { zoomTo(1.3); $('cropError').hidden = false; $('cropGrow').hidden = true; }),
@@ -1502,6 +1536,7 @@ const GROUPS = [
   ['搜索', [['输入中', 'search-input'], ['搜索结果', 'search'], ['没有结果', 'search-empty'], ['正文命中', 'search-hit']]],
   ['发送到电脑', [['头像菜单', 'user-menu'], ['发送到电脑', 'send'], ['切换电脑', 'send-targets'], ['录音中', 'send-rec'], ['上滑取消', 'send-cancel'], ['发送中', 'send-sending'], ['已发送', 'send-done'], ['没有在线的电脑', 'send-offline'], ['电脑没有响应', 'send-timeout'], ['没有记录', 'send-empty'], ['离线', 'send-net-off']]],
   ['我的', [['个人资料', 'profile'], ['已有头像', 'profile-avatar'], ['裁剪头像', 'avatar-crop'], ['保存中', 'avatar-saving'], ['保存失败', 'avatar-error'], ['设备', 'devices'], ['退出登录', 'logout']]],
+  ['更新', [['发现新版本（提示条）', 'update-snack'], ['下载中（提示条）', 'update-snack-down'], ['下载失败（提示条）', 'update-snack-fail'], ['未检查', 'update-idle'], ['检查中', 'update-checking'], ['已是最新', 'update-latest'], ['有新版本', 'update-available'], ['下载中', 'update-downloading'], ['已下载', 'update-ready'], ['检查失败', 'update-check-failed'], ['下载失败', 'update-download-failed'], ['校验失败', 'update-bad-file']]],
 ];
 const dark = location.hash.slice(1).startsWith('dark');
 const state = location.hash.slice(1).replace(/^dark-?/, '');

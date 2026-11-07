@@ -105,27 +105,30 @@ fun Spinner(color: Color, size: Dp = 16.dp, stroke: Dp = 2.dp, modifier: Modifie
     }
 }
 
-enum class BtnKind { Plain, Ghost, Primary, Danger }
+enum class BtnKind { Plain, Ghost, Primary, Danger, Accent }
 
 /** The prototype's .btn: 42dp, rounded 12. */
 @Composable
-fun Btn(text: String, kind: BtnKind = BtnKind.Plain, enabled: Boolean = true, onClick: () -> Unit) {
+fun Btn(text: String, kind: BtnKind = BtnKind.Plain, enabled: Boolean = true, busy: Boolean = false, onClick: () -> Unit) {
     val p = Tokens.palette
     val (bg, fg) = when (kind) {
         BtnKind.Plain -> p.chip to p.ink
         BtnKind.Ghost -> Color.Transparent to p.ink2
         BtnKind.Primary -> p.ink to p.surface
         BtnKind.Danger -> p.rec to Color.White
+        BtnKind.Accent -> p.accent to Color.White
     }
-    Box(
+    Row(
         Modifier
             .height(42.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(bg)
             .pressable(RoundedCornerShape(12.dp), enabled = enabled, onClick = onClick)
             .padding(horizontal = 18.dp),
-        contentAlignment = Alignment.Center,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (busy) Spinner(fg, 14.dp)
         Text(text, color = fg, fontSize = 15.sp, fontWeight = FontWeight.Medium)
     }
 }
@@ -187,13 +190,20 @@ fun DlgField(value: TextFieldValue, onValueChange: (TextFieldValue) -> Unit, onD
 fun selectAll(text: String) = TextFieldValue(text, TextRange(0, text.length))
 
 /** What the snack bar shows; a new message replaces the old one. */
-data class SnackMsg(val text: String, val action: String? = null, val onAction: (() -> Unit)? = null, val id: Long = System.nanoTime())
+data class SnackMsg(
+    val text: String,
+    val action: String? = null,
+    val onAction: (() -> Unit)? = null,
+    /** Stays until replaced or withdrawn, as the download progress does. */
+    val sticky: Boolean = false,
+    val id: Long = System.nanoTime(),
+)
 
 /** The dark capsule at the bottom (.snack), light in dark mode. */
 @Composable
 fun Snack(msg: SnackMsg, onDone: () -> Unit, modifier: Modifier = Modifier) {
     val p = Tokens.palette
-    LaunchedEffect(msg.id) {
+    if (!msg.sticky) LaunchedEffect(msg.id) {
         kotlinx.coroutines.delay(if (msg.action != null) 6000 else 3000)
         onDone()
     }

@@ -15,6 +15,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -69,6 +70,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.onlyquant.tingxie.AppModel
+import top.onlyquant.tingxie.BuildConfig
+import top.onlyquant.tingxie.data.UpdateState
 import top.onlyquant.tingxie.data.CropView
 import top.onlyquant.tingxie.data.userMessage
 import top.onlyquant.tingxie.ui.theme.Tokens
@@ -172,11 +175,66 @@ fun ProfileScreen(m: AppModel) {
                     }
                 }
             }
+            Spacer(Modifier.weight(1f))
+            About(m)
         }
-        m.snack?.let { s ->
-            Snack(s, onDone = { if (m.snack?.id == s.id) m.snack = null }, Modifier.align(Alignment.BottomCenter).padding(bottom = bottomGap() + 16.dp))
+        // The card below shows the download itself.
+        m.snack?.takeUnless { it.sticky }?.let { s ->
+            Snack(s, onDone = { if (m.snack?.id == s.id) m.snack = null }, Modifier.align(Alignment.BottomCenter).padding(bottom = bottomGap() + 96.dp))
         }
     }
+}
+
+/** The app's version and updating it (.about). */
+@Composable
+private fun About(m: AppModel) {
+    val p = Tokens.palette
+    val s = m.updater.state
+    val shape = RoundedCornerShape(16.dp)
+    val (sub, failed) = when (s) {
+        UpdateState.Idle -> null to false
+        UpdateState.Checking -> "正在检查" to false
+        UpdateState.UpToDate -> "已是最新版本" to false
+        UpdateState.CheckFailed -> "检查失败，请重试" to true
+        is UpdateState.Available -> "有新版本 ${s.app.version}" to false
+        is UpdateState.Downloading -> "正在下载 ${s.percent}%" to false
+        is UpdateState.DownloadFailed -> "下载失败，请重试" to true
+        is UpdateState.BadFile -> "安装包校验失败，请重试" to true
+        is UpdateState.Ready -> "已下载 ${s.app.version}" to false
+    }
+    Column(
+        Modifier
+            .padding(start = 16.dp, end = 16.dp, bottom = bottomGap())
+            .fillMaxWidth()
+            .clip(shape)
+            .background(p.surface)
+            .border(1.dp, p.line, shape)
+            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text("听·写 ${BuildConfig.VERSION_NAME}", color = p.ink, fontSize = 15.5.sp)
+                if (sub != null) Text(sub, color = if (failed) p.rec else p.ink2, fontSize = 13.sp, modifier = Modifier.padding(top = 1.dp))
+            }
+            when (s) {
+                UpdateState.Idle, UpdateState.UpToDate -> Btn("检查更新") { act(m) }
+                UpdateState.Checking -> Btn("检查中", enabled = false, busy = true) {}
+                UpdateState.CheckFailed, is UpdateState.DownloadFailed, is UpdateState.BadFile -> Btn("重试") { act(m) }
+                is UpdateState.Available -> Btn("更新", BtnKind.Accent) { act(m) }
+                is UpdateState.Downloading -> Btn("取消", BtnKind.Ghost) { m.updater.act() }
+                is UpdateState.Ready -> Btn("安装", BtnKind.Accent) { m.updater.act() }
+            }
+        }
+        if (s is UpdateState.Downloading) {
+            Box(Modifier.padding(top = 10.dp, end = 4.dp, bottom = 2.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(p.chip)) {
+                Box(Modifier.fillMaxWidth(s.percent / 100f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(p.accent))
+            }
+        }
+    }
+}
+
+private fun act(m: AppModel) {
+    if (m.online) m.updater.act() else m.toast("离线，只能查看")
 }
 
 /**

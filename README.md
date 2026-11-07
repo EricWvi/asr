@@ -81,4 +81,6 @@ task build           # 产物：release/asr
 
 推送 `v*` 标签（如 `v1.2.3`）后，GitHub Actions 构建 `linux/amd64`、`linux/arm64` 镜像并推送到 GHCR，标签为版本号和 `latest`；带 `-` 的预发布版本不更新 `latest`。也可以在 Actions 页面手动运行 release 工作流并填写版本号。
 
+同一个工作流还会构建安卓 APK，和 `latest.json` 一起附到 GitHub Release，安卓端据此更新。签名用的 secrets 是 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`；证书指纹写在工作流里，不符就中止发布。签名密钥一旦丢失，已安装的 app 就无法覆盖升级。
+
 容器内数据目录为 `/app/data`，配置文件需挂载到 `/app/config.yaml`。

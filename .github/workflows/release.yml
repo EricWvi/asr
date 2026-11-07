@@ -16,6 +16,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       # GHCR image names must be lowercase; the repository owner may not be.
@@ -80,3 +82,79 @@ jobs:
             COMMIT=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # The Android app and its update manifest, attached to a GitHub release. The
+  # app reads releases/latest/download/latest.json, which skips pre-releases.
+  android:
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.image.outputs.version }}
+      # The fingerprint of the release key. An update signed by anything else
+      # would not install over the app, so never publish one.
+      CERT_SHA256: 8ec2715ccac614775bfb9e8314b373fb5429e50f67abcc0b46d2292b881eee50
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build the signed APK
+        working-directory: android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          export ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
+          base64 --decode <<<"$KEYSTORE_BASE64" > "$ANDROID_KEYSTORE_FILE"
+          ./gradlew assembleRelease "-PappVersion=${VERSION}"
+          rm -f "$ANDROID_KEYSTORE_FILE"
+
+      - name: Check the signature
+        run: |
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$apksigner" verify --print-certs android/app/build/outputs/apk/release/app-release.apk \
+            | grep -F "certificate SHA-256 digest: ${CERT_SHA256}"
+
+      - name: Write the update manifest
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          APK="tingxie-${VERSION}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$APK"
+          IFS=. read -r MAJOR MINOR PATCH <<<"${VERSION%%-*}"
+          jq -n \
+            --arg version "$VERSION" \
+            --argjson code "$((10#$MAJOR * 1000000 + 10#$MINOR * 1000 + 10#$PATCH))" \
+            --arg url "https://github.com/${REPO}/releases/download/v${VERSION}/${APK}" \
+            --arg sha256 "$(sha256sum "$APK" | cut -d' ' -f1)" \
+            --argjson size "$(stat -c %s "$APK")" \
+            '{version: $version, version_code: $code, url: $url, sha256: $sha256, size: $size}' > latest.json
+          cat latest.json
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "tingxie-${VERSION}.apk" latest.json --clobber
+          else
+            FLAGS=(--generate-notes --target "$GITHUB_SHA")
+            if [[ $VERSION == *-* ]]; then FLAGS+=(--prerelease); fi
+            gh release create "$TAG" "tingxie-${VERSION}.apk" latest.json "${FLAGS[@]}"
+          fi

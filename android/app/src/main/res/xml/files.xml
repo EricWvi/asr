@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shared .md exports live in cache/share. -->
+<!-- Shared .md exports live in cache/share, app updates in cache/update. -->
 <paths>
     <cache-path name="share" path="share/" />
+    <cache-path name="update" path="update/" />
 </paths>
