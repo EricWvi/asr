@@ -115,8 +115,13 @@ class Library(private val api: Api, private val dir: File, private val scope: Co
         return true
     }
 
+    /** Hears every change to a document's text, before it is applied. */
+    var onContent: (Long, Change) -> Unit = { _, _ -> }
+
     /** Applies an edit locally and schedules saving it. Colours save at once. */
     fun edit(id: Long, patch: DocPatch) {
+        val old = docs[id]?.content
+        if (old != null && patch.content != null) Change.between(old, patch.content)?.let { onContent(id, it) }
         docs[id]?.let { docs[id] = it.apply(patch) }
         list?.let { l -> list = l.map { if (it.id == id) it.apply(patch.copy(content = null, tidyRanges = null)) else it } }
         pending[id] = pending[id]?.merge(patch) ?: patch

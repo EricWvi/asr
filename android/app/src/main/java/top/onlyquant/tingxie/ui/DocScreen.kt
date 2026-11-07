@@ -38,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -124,6 +126,7 @@ fun DocScreen(m: AppModel, route: Route.Doc) {
     // Leaving: a new document nobody wrote in is thrown away.
     DisposableEffect(id) {
         onDispose {
+            if (m.tidier.busyWith == id) m.tidier.cancel()
             val d = lib.doc(id)
             if (route.fresh && d != null && d.content.isBlank() && !lib.dirty(id)) {
                 scope.launch {
@@ -175,6 +178,22 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
     val scope = rememberCoroutineScope()
     val talk = remember(doc.id) { DocDictation(m, doc.id, scope) }
     DisposableEffect(talk) { onDispose { if (m.voice.busyWith(talk)) m.voice.abort() } }
+    DisposableEffect(talk) {
+        m.tidier.onPlaced = { id, placed -> if (id == doc.id) talk.showFresh(placed) }
+        onDispose { m.tidier.onPlaced = { _, _ -> } }
+    }
+    // While tidying, a glint sweeps over the text being tidied.
+    val tidying = m.tidier.busyWith == doc.id
+    val shimmer = remember(p, t, density) { Shimmer(p.ink3, t.deep, with(density) { 600.dp.toPx() }) }
+    val glowStyle = remember(shimmer) { SpanStyle(brush = shimmer) }
+    val glow = if (tidying) doc.tidyRanges.fitting(doc.content) else emptyList()
+    val sweep = if (tidying) {
+        androidx.compose.animation.core.rememberInfiniteTransition(label = "tidy").animateFloat(
+            0f, 1f,
+            androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1600, easing = androidx.compose.animation.core.LinearEasing)),
+            label = "sweep",
+        )
+    } else null
 
     // ---------- edit mode ----------
     var editing by remember(doc.id) { mutableStateOf(false) }
@@ -223,7 +242,7 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
             val ch = Change.between(value.text, v.text)!!
             val cur = lib.doc(doc.id) ?: doc
             val ranges = cur.tidyRanges.fitting(value.text).mapped(ch, manual = true)
-            talk.fresh = talk.fresh?.let { (a, b) -> ch.map(a, 1) to ch.map(b, -1) }?.takeIf { it.first < it.second }
+            talk.fresh = talk.fresh.mapNotNull { (a, b) -> (ch.map(a, 1) to ch.map(b, -1)).takeIf { it.first < it.second } }
             lib.edit(doc.id, DocPatch(content = v.text, tidyRanges = ranges))
         }
         value = v
@@ -273,7 +292,8 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
     val shown = if (interim == null || editing) doc.content else doc.content.substring(0, at) + interim + doc.content.substring(at)
     val overlays = buildList {
         if (interim != null && interim.isNotEmpty()) add(Overlay(at, at + interim.length, dim))
-        talk.fresh?.let { (a, b) -> add(Overlay(a, b, tag = Backdrops.FRESH, item = t.deep.toArgb().toString())) }
+        for ((a, b) in talk.fresh) add(Overlay(a, b, tag = Backdrops.FRESH, item = t.deep.toArgb().toString()))
+        for ((a, b) in glow) add(Overlay(a, b, style = glowStyle))
     }
 
     // From a search result: scroll the first block with a hit into the middle.
@@ -337,13 +357,15 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
                 Modifier
                     .fillMaxWidth()
                     .onGloballyPositioned { bodyTop = it.positionInParent().y + with(density) { 22.dp.toPx() } }
-                    .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = if (editing) 40.dp else 200.dp),
+                    .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = if (editing) 40.dp else 200.dp)
+                    .then(if (sweep != null) Modifier.drawWithContent { shimmer.at(sweep.value); drawContent() } else Modifier),
             ) {
                 if (editing) {
                     Editor(
                         value, ::onEdit, hl,
                         interim = interim, at = at, interimStyle = dim,
                         fresh = talk.fresh, freshAlpha = { talk.freshAlpha.value }, freshColor = t.deep,
+                        glow = glow, glowStyle = glowStyle,
                         onLayout = { layout = it },
                         modifier = Modifier.focusRequester(bodyFocus),
                     )
@@ -421,15 +443,17 @@ private fun Editor(
     interim: String?,
     at: Int,
     interimStyle: SpanStyle,
-    fresh: Pair<Int, Int>?,
+    fresh: List<Pair<Int, Int>>,
     freshAlpha: () -> Float,
     freshColor: Color,
+    glow: List<List<Int>>,
+    glowStyle: SpanStyle,
     onLayout: (TextLayoutResult) -> Unit,
     modifier: Modifier,
 ) {
     val p = Tokens.palette
     var l by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val transform = remember(hl, interim, at, interimStyle) { SourceTransformation(hl, interim, at, interimStyle) }
+    val transform = remember(hl, interim, at, interimStyle, glow, glowStyle) { SourceTransformation(hl, interim, at, interimStyle, glow, glowStyle) }
     val blocks = remember(value.text) { codeBlocks(value.text) }
     val n = interim?.length ?: 0
     fun tx(o: Int) = if (o <= at || n == 0) o else o + n
@@ -452,19 +476,20 @@ private fun Editor(
                     val bottom = lay.getLineBottom(lay.getLineForOffset(e))
                     drawRoundRect(p.codeBlock, Offset(-pad, top), androidx.compose.ui.geometry.Size(size.width + 2 * pad, bottom - top), androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()))
                 }
-                val f = fresh ?: return@drawBehind
                 val alpha = freshAlpha()
-                if (alpha <= 0f) return@drawBehind
-                val fs = tx(f.first).coerceIn(0, len)
-                val fe = tx(f.second).coerceIn(0, len)
-                if (fs >= fe) return@drawBehind
-                val first = lay.getLineForOffset(fs)
-                val last = lay.getLineForOffset(fe - 1)
-                for (line in first..last) {
-                    val left = if (line == first) lay.getHorizontalPosition(fs, true) else lay.getLineLeft(line)
-                    val right = if (line == last) lay.getHorizontalPosition(fe, true) else lay.getLineRight(line)
-                    val y = lay.getLineBaseline(line) + 5.dp.toPx()
-                    drawLine(freshColor.copy(alpha = alpha), Offset(left, y), Offset(right, y), 2.dp.toPx())
+                if (fresh.isEmpty() || alpha <= 0f) return@drawBehind
+                for (f in fresh) {
+                    val fs = tx(f.first).coerceIn(0, len)
+                    val fe = tx(f.second).coerceIn(0, len)
+                    if (fs >= fe) continue
+                    val first = lay.getLineForOffset(fs)
+                    val last = lay.getLineForOffset(fe - 1)
+                    for (line in first..last) {
+                        val left = if (line == first) lay.getHorizontalPosition(fs, true) else lay.getLineLeft(line)
+                        val right = if (line == last) lay.getHorizontalPosition(fe, true) else lay.getLineRight(line)
+                        val y = lay.getLineBaseline(line) + 5.dp.toPx()
+                        drawLine(freshColor.copy(alpha = alpha), Offset(left, y), Offset(right, y), 2.dp.toPx())
+                    }
                 }
             },
     )
@@ -475,6 +500,7 @@ private fun Editor(
 private fun Tools(m: AppModel, doc: Doc, talk: DocDictation, onHide: () -> Unit) {
     val p = Tokens.palette
     val pending = doc.tidyRanges.fitting(doc.content).isNotEmpty()
+    val tidying = m.tidier.busyWith == doc.id
     Row(
         Modifier
             .fillMaxWidth()
@@ -487,18 +513,29 @@ private fun Tools(m: AppModel, doc: Doc, talk: DocDictation, onHide: () -> Unit)
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(
-            Modifier.height(44.dp).pressable(CircleShape) { if (!pending) m.toast("没有待整理的文字") }.dim(!pending).padding(horizontal = 12.dp),
+            Modifier.height(44.dp).pressable(CircleShape) { tapTidy(m, doc, talk) }.dim(!pending && !tidying).padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Ico(Icons.Sparkle, p.ink2, 18.dp)
-            Text("整理", color = p.ink2, fontSize = 14.sp)
+            if (tidying) Spinner(p.ink2, 18.dp) else Ico(Icons.Sparkle, p.ink2, 18.dp)
+            Text(if (tidying) "整理中" else "整理", color = p.ink2, fontSize = 14.sp)
         }
-        HoldButton(m, talk, Modifier.weight(1f).height(42.dp), fontSize = 15.sp, glow = 4.dp, shadow = false)
+        HoldButton(m, talk, Modifier.weight(1f).height(42.dp), fontSize = 15.sp, glow = 4.dp, shadow = false, off = tidying)
         Box(Modifier.size(44.dp).pressable(CircleShape, onClick = onHide), contentAlignment = Alignment.Center) {
             Ico(Icons.KbHide, p.ink2)
         }
     }
+}
+
+/**
+ * 整理: starts tidying (the earlier underline goes), or cancels it. Not
+ * while talking; with nothing to tidy it says so.
+ */
+private fun tapTidy(m: AppModel, doc: Doc, talk: DocDictation) {
+    val tidying = m.tidier.busyWith == doc.id
+    if (!tidying && m.voice.phase != top.onlyquant.tingxie.voice.Phase.Idle) return
+    if (!tidying) talk.showFresh(emptyList())
+    m.tidier.toggle(doc.id)
 }
 
 /** Flips "[ ]" and "[x]" at the given offset of the source. */
@@ -653,14 +690,15 @@ private fun Dock(m: AppModel, doc: Doc, talk: DocDictation, onKeyboard: () -> Un
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         val pending = doc.tidyRanges.fitting(doc.content).isNotEmpty()
-        DockSide(Icons.Sparkle, "整理", disabled = !pending) { if (!pending) m.toast("没有待整理的文字") }
-        HoldButton(m, talk, Modifier.weight(1f).height(56.dp))
+        val tidying = m.tidier.busyWith == doc.id
+        DockSide(Icons.Sparkle, if (tidying) "整理中" else "整理", disabled = !pending && !tidying, busy = tidying) { tapTidy(m, doc, talk) }
+        HoldButton(m, talk, Modifier.weight(1f).height(56.dp), off = tidying)
         DockSide(Icons.Keyboard, "键盘", onClick = onKeyboard)
     }
 }
 
 @Composable
-private fun DockSide(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, disabled: Boolean = false, onClick: () -> Unit) {
+private fun DockSide(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, disabled: Boolean = false, busy: Boolean = false, onClick: () -> Unit) {
     val p = Tokens.palette
     Column(
         Modifier
@@ -671,7 +709,7 @@ private fun DockSide(icon: androidx.compose.ui.graphics.vector.ImageVector, labe
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
     ) {
-        Ico(icon, p.ink2, 18.dp)
+        if (busy) Spinner(p.ink2, 18.dp) else Ico(icon, p.ink2, 18.dp)
         Text(label, color = p.ink2, fontSize = 12.sp, lineHeight = 16.sp)
     }
 }
@@ -690,7 +728,7 @@ class DocDictation(private val m: AppModel, private val id: Long, private val sc
     var insertionPoint: () -> Int = { m.library.doc(id)?.content?.length ?: 0 }
     /** Called with [from, to) of the text just written. */
     var onWritten: (Int, Int) -> Unit = { _, _ -> }
-    var fresh by mutableStateOf<Pair<Int, Int>?>(null)
+    var fresh by mutableStateOf<List<Pair<Int, Int>>>(emptyList())
     val freshAlpha = Animatable(1f)
     private var fading: Job? = null
 
@@ -713,7 +751,7 @@ class DocDictation(private val m: AppModel, private val id: Long, private val sc
         val b = a + text.length
         val ranges = d.tidyRanges.fitting(c).mapped(Change(a, a, text.length), manual = false).plus(a, b)
         m.library.edit(id, top.onlyquant.tingxie.data.DocPatch(content = c.substring(0, a) + text + c.substring(a), tidyRanges = ranges))
-        showFresh(a, b)
+        showFresh(listOf(a to b))
         onWritten(a, b)
     }
 
@@ -721,15 +759,16 @@ class DocDictation(private val m: AppModel, private val id: Long, private val sc
         interim = null
     }
 
-    /** Underlines [from, to) for 2.5 s, then fades it out over 1.2 s. */
-    fun showFresh(from: Int, to: Int) {
+    /** Underlines the spans for 2.5 s, then fades them out over 1.2 s; none clears it. */
+    fun showFresh(spans: List<Pair<Int, Int>>) {
         fading?.cancel()
-        fresh = from to to
+        fresh = spans
+        if (spans.isEmpty()) return
         fading = scope.launch {
             freshAlpha.snapTo(1f)
             delay(2500)
             freshAlpha.animateTo(0f, androidx.compose.animation.core.tween(1200))
-            fresh = null
+            fresh = emptyList()
         }
     }
 }

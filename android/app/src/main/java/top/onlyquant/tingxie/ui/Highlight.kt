@@ -156,16 +156,22 @@ class Highlight(private val p: Palette, private val tint: Tint) {
 
 /**
  * Colours the source and shows what is being heard at [at], faint (struck
- * through while cancelling), without it being part of the text.
+ * through while cancelling), without it being part of the text. [glow]
+ * spans get [glowStyle] (the shimmer while tidying).
  */
 class SourceTransformation(
     private val hl: Highlight,
     private val interim: String?,
     private val at: Int,
     private val interimStyle: SpanStyle,
+    private val glow: List<List<Int>> = emptyList(),
+    private val glowStyle: SpanStyle? = null,
 ) : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
-        val coloured = hl.annotate(text.text)
+        val plain = hl.annotate(text.text)
+        val coloured = if (glow.isEmpty() || glowStyle == null) plain else AnnotatedString.Builder(plain).apply {
+            for ((a, b) in glow) if (b <= text.length) addStyle(glowStyle, a, b)
+        }.toAnnotatedString()
         val extra = interim.orEmpty()
         if (extra.isEmpty()) return TransformedText(coloured, OffsetMapping.Identity)
         val a = at.coerceIn(0, text.length)
@@ -187,7 +193,8 @@ class SourceTransformation(
         })
     }
 
-    override fun equals(other: Any?) = other is SourceTransformation && other.interim == interim && other.at == at && other.hl === hl && other.interimStyle == interimStyle
+    override fun equals(other: Any?) = other is SourceTransformation && other.interim == interim && other.at == at && other.hl === hl &&
+        other.interimStyle == interimStyle && other.glow == glow && other.glowStyle == glowStyle
     override fun hashCode() = (interim?.hashCode() ?: 0) * 31 + at
 }
 

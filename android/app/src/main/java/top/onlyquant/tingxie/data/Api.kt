@@ -1,6 +1,9 @@
 package top.onlyquant.tingxie.data
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -77,6 +80,12 @@ data class Device(
 
 @Serializable
 data class SignedIn(val token: String, val device: Device)
+
+@Serializable
+data class TidyRequest(val text: String, val headings: List<String>, val prefix: String, val suffix: String)
+
+@Serializable
+private data class TidyLine(val type: String, val text: String = "", val message: String = "")
 
 @Serializable
 private data class ErrorBody(val error: String = "")
@@ -172,6 +181,65 @@ class Api(val session: Session, private val onUnauthorized: () -> Unit) {
     }
 
     suspend fun devices(): List<Device> = get("/api/devices")
+
+    /** The model may think for a while before writing; the server gives up after two minutes. */
+    private val slow: OkHttpClient by lazy { http.newBuilder().readTimeout(150, TimeUnit.SECONDS).build() }
+
+    /**
+     * Asks the server to tidy a transcript and returns the written text once
+     * the model has finished; the server streams it as JSON lines.
+     */
+    suspend fun tidy(req: TidyRequest): String {
+        val c = slow.newCall(Request.Builder().url(url("/api/tidy")).post(req.body()).build())
+        val res = try {
+            c.await()
+        } catch (e: IOException) {
+            throw ApiError(0, "无法连接服务器")
+        }
+        if (!res.isSuccessful) {
+            try {
+                res.text()
+            } catch (e: ApiError) {
+                if (e.status == 401) onUnauthorized()
+                throw e
+            }
+        }
+        // Reading blocks; cancelling the coroutine cancels the call, which ends the read.
+        return kotlinx.coroutines.coroutineScope {
+            val watch = launch {
+                try {
+                    kotlinx.coroutines.awaitCancellation()
+                } finally {
+                    c.cancel()
+                }
+            }
+            try {
+                withContext(Dispatchers.IO) { res.use { readTidy(it) } }
+            } finally {
+                watch.cancel()
+            }
+        }
+    }
+
+    private fun readTidy(r: Response): String {
+        val out = StringBuilder()
+        val src = r.body.source()
+        while (true) {
+            val line = try {
+                src.readUtf8Line()
+            } catch (e: IOException) {
+                null
+            } ?: break
+            if (line.isBlank()) continue
+            val m = runCatching { json.decodeFromString<TidyLine>(line) }.getOrNull() ?: continue
+            when (m.type) {
+                "delta" -> out.append(m.text)
+                "error" -> throw ApiError(502, m.message.ifEmpty { "整理失败，请稍后再试" })
+                "done" -> return out.toString()
+            }
+        }
+        throw ApiError(0, "整理中断，请稍后再试")
+    }
 
     /** Signs this device out on the server. */
     suspend fun signOut() {

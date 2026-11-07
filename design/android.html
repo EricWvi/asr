@@ -1254,13 +1254,16 @@ const tidySpin = (on) => {
   $('tidyText').textContent = on ? '整理中' : '整理';
   $('hold').classList.toggle('off', on); $('hold2').classList.toggle('off', on);
 };
+// 整理完成后提示条带「撤销」：换回原文，重新算待整理；之后改过正文就不能撤销了
 const tidyDone = () => {
   tidySpin(false);
-  pendings().forEach((p) => {
+  const swapped = pendings().map((p) => {
     const f = document.createElement('span'); f.className = 'fresh'; f.textContent = p.dataset.tidied;
     p.replaceWith(f); void f.offsetWidth; f.classList.add('fading');
+    return [f, p];
   });
   syncTidy();
+  snack('已整理', '撤销', () => { swapped.forEach(([f, p]) => f.replaceWith(p)); syncTidy(); });
 };
 const startTidy = () => { document.querySelectorAll('.fresh').forEach((f) => f.classList.remove('fresh', 'fading')); tidySpin(true); };
 const tidyClick = () => {

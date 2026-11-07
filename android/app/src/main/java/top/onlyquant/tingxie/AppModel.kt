@@ -72,6 +72,16 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     val voice = top.onlyquant.tingxie.voice.Voice(app, viewModelScope) { toast(it) }
 
+    val tidier = top.onlyquant.tingxie.data.Tidier(
+        viewModelScope, { library }, { api },
+        toast = { text, action, onAction ->
+            toast(text, action, onAction)
+            if (action != null) tidySnack = snack?.id
+        },
+        withdraw = { if (snack?.id == tidySnack) snack = null },
+    )
+    private var tidySnack: Long? = null
+
     fun toast(text: String, action: String? = null, onAction: (() -> Unit)? = null) {
         snack = SnackMsg(text, action, onAction)
     }
@@ -159,7 +169,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         if (api != null) {
             refresh()
             (stack.lastOrNull() as? Route.Doc)?.let { r ->
-                viewModelScope.launch { library.reload(r.id) { voice.phase == top.onlyquant.tingxie.voice.Phase.Idle } }
+                viewModelScope.launch { library.reload(r.id) { voice.phase == top.onlyquant.tingxie.voice.Phase.Idle && tidier.busyWith == null } }
             }
         }
         if (!awaitingBrowser) return
@@ -179,6 +189,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         val a = Api(s) { viewModelScope.launch { revoked() } }
         val ctx = getApplication<Application>()
         library = Library(a, File(ctx.filesDir, "docs"), viewModelScope)
+        library.onContent = tidier::onChange
         api = a
         loginMsg = null
         stack.clear()
@@ -215,6 +226,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun endSession() {
+        tidier.cancel()
         library.clear()
         prefs.signOut()
         api = null
