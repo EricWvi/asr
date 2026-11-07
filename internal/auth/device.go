@@ -354,7 +354,8 @@ func (d devicePageData) RedirectURL() template.URL { return template.URL(d.Redir
 func (s *Service) devicePage(w http.ResponseWriter, status int, data devicePageData) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Referrer-Policy", "no-referrer")
+	// Not no-referrer: under it the form posts "Origin: null" and fails sameOrigin.
+	w.Header().Set("Referrer-Policy", "same-origin")
 	w.WriteHeader(status)
 	if err := devicePageTmpl.Execute(w, data); err != nil {
 		slog.Error("render device page", "err", err)

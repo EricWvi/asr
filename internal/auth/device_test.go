@@ -197,6 +197,18 @@ func TestDeviceApprovalChecks(t *testing.T) {
 	}
 }
 
+// Under Referrer-Policy: no-referrer a browser posts the form with
+// "Origin: null", which the origin check refuses.
+func TestDeviceConfirmLetsTheFormNameItsOrigin(t *testing.T) {
+	svc, h := newService(t, Config{PublicURL: "https://asr.test", Issuer: "https://idp.invalid", ClientID: "x", ClientSecret: "y"})
+	req := deviceRequest{Platform: "android", Name: "Pixel", RedirectURI: AndroidRedirect, State: "st", Challenge: challenge("v")}
+	id := svc.flows.addApproval(approval{user: store.User{ID: 1, Name: "eric"}, req: req, expires: time.Now().Add(time.Minute)})
+	rec := request(h, "GET", "/auth/device/confirm", "", http.Header{"Cookie": {approvalCookie + "=" + id}})
+	if got := rec.Header().Get("Referrer-Policy"); got != "same-origin" {
+		t.Fatalf("Referrer-Policy = %q, want same-origin", got)
+	}
+}
+
 func TestDeviceConfirmShowsAvatar(t *testing.T) {
 	svc, h := newService(t, Config{DevUser: "eric"})
 	rec := serve(h, "GET", deviceLoginURL("mac", macRedirect, "verifier-1"))
