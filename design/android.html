@@ -8,7 +8,7 @@
 /*
  * 安卓客户端（Compose）原型，设计宽度 412dp。token 和视觉语言沿用 pc.html：
  * 暖白底、米黄纸面、大圆角、柔和阴影；每份文稿一个粉彩色，交互强调色用蓝，录音中用红。
- * 结构：打开进上次的文稿（查看模式），‹ 文稿 回到列表；列表右上角头像菜单里是
+ * 结构：打开进文稿列表，点一篇进文稿（查看模式），‹ 文稿 回到列表；列表右上角头像菜单里是
  * 发送到电脑、个人资料、设备、退出登录。
  */
 :root {
@@ -1019,7 +1019,7 @@ $('loginBtn').onclick = () => show('tab');
 $('serverBtn').onclick = () => { open('serverDlg'); ime(true); $('serverInput').focus(); };
 $('tabClose').onclick = () => { show('login'); loginMsg('已取消登录'); };
 $('tabDeny').onclick = () => { show('login'); loginMsg('已取消登录'); };
-$('tabAllow').onclick = () => { show('login'); loginBusy(); setTimeout(() => openDoc(), 900); };
+$('tabAllow').onclick = () => { show('login'); loginBusy(); setTimeout(() => openList(), 900); };
 
 // ---------- 文稿列表 ----------
 const DOCS = [
@@ -1332,10 +1332,12 @@ const sentHTML = (s) => {
 };
 const renderSends = () => {
   const box = $('sends');
-  box.innerHTML = sends.length ? '<div class="label">最近</div>' + sends.map(sentHTML).join('') : '<div class="empty" style="padding-top:120px">还没有发送过</div>';
+  // 最新的在最上面（识别中的那条也在最上面）；只保留 30 天内的记录，列表是虚拟列表
+  const shown = [...sends].reverse();
+  box.innerHTML = sends.length ? '<div class="label">最近</div>' + shown.map(sentHTML).join('') : '<div class="empty" style="padding-top:120px">还没有发送过</div>';
   box.querySelectorAll('[data-copy]').forEach((b) => b.onclick = () => snack('已复制'));
-  box.querySelectorAll('[data-resend]').forEach((b, i) => b.onclick = () => { const s = sends[i]; if (s.err) sends.splice(i, 1); sends.push({ t: s.t, to: 'Eric 的 MacBook Pro', at: '14:32', fresh: true }); renderSends(); });
-  requestAnimationFrame(() => { $('sendScroll').scrollTop = $('sendScroll').scrollHeight; });
+  box.querySelectorAll('[data-resend]').forEach((b, i) => b.onclick = () => { const s = shown[i]; if (s.err) sends.splice(sends.indexOf(s), 1); sends.push({ t: s.t, to: 'Eric 的 MacBook Pro', at: '14:32', fresh: true }); renderSends(); });
+  requestAnimationFrame(() => { $('sendScroll').scrollTop = 0; });
 };
 const openSend = () => { show('send'); renderTarget(); renderSends(); };
 $('sendBack').onclick = () => openList();
@@ -1529,10 +1531,10 @@ const STATES = {
 // 原型专用：右下角的状态菜单。点一项跳到对应锚点并重新加载；「暗色」可以和其他状态组合。自动化截图时不显示。
 const GROUPS = [
   ['登录', [['登录页', 'login'], ['确认页（Custom Tab）', 'login-tab'], ['正在登录', 'login-progress'], ['已取消', 'login-cancel'], ['登录失败', 'login-error'], ['更改服务器', 'login-server'], ['启动图标', 'icon']]],
-  ['文稿', [['上次的文稿（启动）', ''], ['滚动后', 'doc-scrolled'], ['取色板', 'doc-colors'], ['更多菜单', 'doc-menu'], ['新建文稿', 'doc-new'], ['改标题', 'doc-title'], ['编辑（点正文）', 'doc-edit'], ['编辑（点键盘，文末）', 'doc-edit-end'], ['离线', 'offline'], ['落选：圆形麦克风', 'doc-fab']]],
+  ['文稿', [['文稿', 'doc'], ['滚动后', 'doc-scrolled'], ['取色板', 'doc-colors'], ['更多菜单', 'doc-menu'], ['新建文稿', 'doc-new'], ['改标题', 'doc-title'], ['编辑（点正文）', 'doc-edit'], ['编辑（点键盘，文末）', 'doc-edit-end'], ['离线', 'offline'], ['落选：圆形麦克风', 'doc-fab']]],
   ['语音', [['录音中', 'rec'], ['最后 30 秒', 'countdown'], ['上滑取消', 'rec-cancel'], ['编辑时录音', 'rec-edit'], ['刚写入', 'rec-done'], ['识别中断', 'asr-error'], ['落选：卡片式提示', 'asr-error-card'], ['请求麦克风权限', 'mic-ask'], ['没有麦克风权限', 'mic-denied']]],
   ['整理', [['整理中', 'tidying'], ['整理完成', 'tidied'], ['没有待整理', 'tidy-empty'], ['整理失败', 'tidy-error']]],
-  ['列表', [['文稿列表', 'list'], ['落选：毛玻璃', 'list-blur'], ['落选：扩展新建按钮', 'list-fab-wide'], ['只看天空色', 'list-sky'], ['筛选为空', 'list-filter-empty'], ['长按菜单', 'list-sheet'], ['重命名', 'rename'], ['删除后撤销', 'deleted'], ['没有文稿', 'list-empty']]],
+  ['列表', [['文稿列表（启动）', ''], ['落选：毛玻璃', 'list-blur'], ['落选：扩展新建按钮', 'list-fab-wide'], ['只看天空色', 'list-sky'], ['筛选为空', 'list-filter-empty'], ['长按菜单', 'list-sheet'], ['重命名', 'rename'], ['删除后撤销', 'deleted'], ['没有文稿', 'list-empty']]],
   ['搜索', [['输入中', 'search-input'], ['搜索结果', 'search'], ['没有结果', 'search-empty'], ['正文命中', 'search-hit']]],
   ['发送到电脑', [['头像菜单', 'user-menu'], ['发送到电脑', 'send'], ['切换电脑', 'send-targets'], ['录音中', 'send-rec'], ['上滑取消', 'send-cancel'], ['发送中', 'send-sending'], ['已发送', 'send-done'], ['没有在线的电脑', 'send-offline'], ['电脑没有响应', 'send-timeout'], ['没有记录', 'send-empty'], ['离线', 'send-net-off']]],
   ['我的', [['个人资料', 'profile'], ['已有头像', 'profile-avatar'], ['裁剪头像', 'avatar-crop'], ['保存中', 'avatar-saving'], ['保存失败', 'avatar-error'], ['设备', 'devices'], ['退出登录', 'logout']]],
@@ -1542,7 +1544,7 @@ const dark = location.hash.slice(1).startsWith('dark');
 const state = location.hash.slice(1).replace(/^dark-?/, '');
 if (dark) root.dataset.theme = 'dark';
 else if (location.hash.length > 1) root.dataset.theme = 'light';
-(STATES[state] || STATES.doc)();
+(STATES[state] || STATES.list)();
 {
   const go = (st, d) => { location.hash = [d ? 'dark' : '', st].filter(Boolean).join('-') || '_'; location.reload(); };
   const btn = document.createElement('button');

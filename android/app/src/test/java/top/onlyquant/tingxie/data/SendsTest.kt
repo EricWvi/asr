@@ -28,6 +28,13 @@ class SendsTest {
         assertEquals("发送中断，文字已保留", cut.error)
     }
 
+    @Test fun recordsOlderThanThirtyDaysAreDropped() {
+        val now = 100L * 24 * 60 * 60 * 1000
+        val day = 24L * 60 * 60 * 1000
+        val kept = listOf(rec(now - 31 * day), rec(now - 30 * day), rec(now - 30 * day + 1), rec(now)).recent(now)
+        assertEquals(listOf(now - 30 * day + 1, now), kept.map { it.id })
+    }
+
     @Test fun failuresReadAsTheDesignSays() {
         assertEquals("没有在线的电脑，文字已保留", sendFailure(ApiError(409, "没有在线的电脑")))
         assertEquals("这台电脑不在线，文字已保留", sendFailure(ApiError(409, "这台电脑不在线")))

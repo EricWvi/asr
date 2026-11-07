@@ -24,7 +24,6 @@ class Prefs(private val context: Context) {
         val server = stringPreferencesKey("server")
         val token = stringPreferencesKey("token")
         val deviceId = longPreferencesKey("device_id")
-        val lastDoc = longPreferencesKey("last_doc")
         val sendTarget = longPreferencesKey("send_target")
         val updateCheckedAt = longPreferencesKey("update_checked_at")
         val updatePrompted = stringPreferencesKey("update_prompted")
@@ -55,14 +54,7 @@ class Prefs(private val context: Context) {
     suspend fun signOut() = context.store.edit {
         it.remove(K.token)
         it.remove(K.deviceId)
-        it.remove(K.lastDoc)
         it.remove(K.sendTarget)
-    }
-
-    suspend fun lastDoc(): Long? = read()[K.lastDoc]
-
-    suspend fun setLastDoc(id: Long?) = context.store.edit {
-        if (id == null) it.remove(K.lastDoc) else it[K.lastDoc] = id
     }
 
     /** The Mac chosen for sending; 0 is 自动. */

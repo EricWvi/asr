@@ -208,18 +208,6 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         stack.add(Route.List)
         refresh()
         if (online) updater.autoCheck()
-        val last = prefs.lastDoc()
-        if (last != null) {
-            stack.add(Route.Doc(last))
-            return
-        }
-        // First launch: the newest document, or a new one.
-        val list = library.list ?: runCatching { library.refreshList(); library.list }.getOrNull()
-        when {
-            list == null -> Unit
-            list.isNotEmpty() -> open(list.first().id)
-            else -> newDoc()
-        }
     }
 
     /** Re-reads what the server knows, quietly; offline keeps the cache. */
@@ -296,7 +284,6 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun open(id: Long, hits: List<String> = emptyList(), fresh: Boolean = false) {
-        viewModelScope.launch { prefs.setLastDoc(id) }
         stack.add(Route.Doc(id, hits, fresh))
     }
 
@@ -315,16 +302,10 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** A document closed: forget it if it was opened only to be deleted. */
-    fun forgetLast(id: Long) {
-        viewModelScope.launch { if (prefs.lastDoc() == id) prefs.setLastDoc(null) }
-    }
-
     fun deleteDoc(id: Long, title: String) {
         viewModelScope.launch {
             try {
                 library.delete(id)
-                forgetLast(id)
                 toast("已删除「$title」", "撤销") {
                     viewModelScope.launch {
                         try {

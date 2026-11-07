@@ -117,7 +117,6 @@ fun DocScreen(m: AppModel, route: Route.Doc) {
             lib.fetch(id)
         } catch (e: ApiError) {
             if (e.status == 404) {
-                m.forgetLast(id)
                 m.toast("内容不存在或已被删除")
                 m.back()
             } else if (lib.doc(id) == null) failed = e.userMessage()
@@ -132,10 +131,7 @@ fun DocScreen(m: AppModel, route: Route.Doc) {
             if (m.tidier.busyWith == id) m.tidier.cancel()
             val d = lib.doc(id)
             if (route.fresh && d != null && d.content.isBlank() && !lib.dirty(id)) {
-                scope.launch {
-                    runCatching { lib.delete(id) }
-                    m.forgetLast(id)
-                }
+                scope.launch { runCatching { lib.delete(id) } }
             } else {
                 scope.launch { lib.flush(id) }
             }

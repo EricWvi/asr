@@ -98,9 +98,10 @@ class SendDictation(private val m: AppModel) : DictationTarget {
 }
 
 /**
- * 发送到电脑: the target Mac on top, the records below with the newest next
- * to the talk button, which sends on letting go. The list hangs from the
- * bottom so a growing live card pushes the older ones up.
+ * 发送到电脑: the target Mac on top, the records below, newest first; the
+ * talk button at the bottom sends on letting go. What is being heard shows
+ * first of all, pushing the records down. The list is lazy, as 30 days of
+ * records can run long.
  */
 @Composable
 fun SendScreen(m: AppModel) {
@@ -115,6 +116,7 @@ fun SendScreen(m: AppModel) {
 
     // A Mac's online state stays current while the page is open, as on the devices page.
     LaunchedEffect(Unit) {
+        sends.prune()
         while (true) {
             sends.refreshMacs()
             delay(10_000)
@@ -141,11 +143,12 @@ fun SendScreen(m: AppModel) {
                 LazyColumn(
                     Modifier.weight(1f).fillMaxWidth(),
                     state = list,
-                    reverseLayout = true,
-                    // Short lists still start under the target card.
-                    verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Top),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = bottomGap() + 108.dp),
                 ) {
+                    item(key = "label") {
+                        Text("最近", color = p.ink3, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp))
+                    }
                     if (live != null) item(key = "live") { LiveCard(live, m.voice.cancelling) }
                     items(records.asReversed(), key = { it.id }) { r ->
                         SentCard(
@@ -161,9 +164,6 @@ fun SendScreen(m: AppModel) {
                                 else sends.send(r.text, replacing = r.id.takeIf { r.state == SendState.Failed })
                             },
                         )
-                    }
-                    item(key = "label") {
-                        Text("最近", color = p.ink3, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp))
                     }
                 }
             }

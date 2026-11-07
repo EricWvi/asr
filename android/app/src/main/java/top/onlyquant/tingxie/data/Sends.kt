@@ -20,7 +20,7 @@ import java.io.File
 @Serializable
 enum class SendState { Sending, Sent, Failed }
 
-/** One thing sent to a Mac. [to] is null while no Mac is known; [at] is when it arrived. */
+/** One thing sent to a Mac; [id] is when it was sent. [to] is null while no Mac is known; [at] is when it arrived. */
 @Serializable
 data class SendRecord(
     val id: Long,
@@ -31,7 +31,11 @@ data class SendRecord(
     val error: String = "",
 )
 
-const val KeepSends = 20
+/** Records older than this are dropped, however many there are. */
+const val KeepSendsMs = 30L * 24 * 60 * 60 * 1000
+
+/** The records still within [KeepSendsMs] of [now]. */
+fun List<SendRecord>.recent(now: Long) = filter { now - it.id < KeepSendsMs }
 
 /** A send the process did not live to see the end of may or may not have arrived. */
 fun List<SendRecord>.restored() = map {
@@ -59,7 +63,7 @@ class Sends(private val api: Api, private val file: File, private val prefs: Pre
     private val writing = Mutex()
     private var lastId = 0L
 
-    /** Oldest first, as shown from the top. */
+    /** Oldest first; the page shows them the other way round. */
     val records = mutableStateListOf<SendRecord>()
 
     /** The chosen Mac's id; 0 is 自动. */
@@ -80,7 +84,7 @@ class Sends(private val api: Api, private val file: File, private val prefs: Pre
             val saved = withContext(Dispatchers.IO) {
                 runCatching { json.decodeFromString<List<SendRecord>>(file.readText()) }.getOrNull()
             }
-            if (saved != null) records.addAll(0, saved.restored())
+            if (saved != null) records.addAll(0, saved.restored().recent(System.currentTimeMillis()))
         }
     }
 
@@ -114,7 +118,7 @@ class Sends(private val api: Api, private val file: File, private val prefs: Pre
         val to = target
         if (replacing != null) records.removeAll { it.id == replacing }
         records.add(SendRecord(id, text, SendState.Sending, expected?.name))
-        while (records.size > KeepSends) records.removeAt(0)
+        prune()
         save()
         scope.launch {
             try {
@@ -127,6 +131,14 @@ class Sends(private val api: Api, private val file: File, private val prefs: Pre
                 refreshMacs()
             }
         }
+    }
+
+    /** Drops the records past 30 days; also run when the page opens, as the app may stay up for days. */
+    fun prune() {
+        val now = System.currentTimeMillis()
+        if (records.all { now - it.id < KeepSendsMs }) return
+        records.retainAll { now - it.id < KeepSendsMs }
+        save()
     }
 
     private fun update(id: Long, change: (SendRecord) -> SendRecord) {
