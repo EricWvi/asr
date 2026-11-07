@@ -458,7 +458,7 @@ svg { display: block; }
 .sends .label { padding: 6px 4px 0; font-size: 13px; color: var(--ink-3); }
 .sent { padding: 12px 6px 6px 14px; border-radius: 16px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
 .sent-text { padding-right: 8px; font-size: 16px; line-height: 1.6; user-select: text; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.sent-foot { display: flex; align-items: center; gap: 2px; margin-top: 2px; }
+.sent-foot { display: flex; align-items: center; gap: 2px; margin-top: 2px; min-height: 40px; }
 .sent-meta { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; }
 .sent-meta span { overflow: hidden; text-overflow: ellipsis; }
 .sent-meta .ok { color: var(--accent); }
@@ -845,6 +845,7 @@ svg { display: block; }
       <button class="back" id="sendBack"><svg class="icon"><use href="#i-back"/></svg></button>
       <h1>发送到电脑</h1>
     </div>
+    <div class="offline-bar" id="sendOffline" hidden><svg class="icon sm"><use href="#i-cloud-off"/></svg>离线，只能查看</div>
     <button class="target" id="target">
       <span class="dev-icon"><svg class="icon"><use href="#i-laptop"/></svg></span>
       <span class="target-body"><div class="target-name" id="targetName">Eric 的 MacBook Pro</div><div class="target-sub" id="targetSub"><span class="online"></span>在线 · 自动选择</div></span>
@@ -1321,7 +1322,7 @@ const renderSends = () => {
   const box = $('sends');
   box.innerHTML = sends.length ? '<div class="label">最近</div>' + sends.map(sentHTML).join('') : '<div class="empty" style="padding-top:120px">还没有发送过</div>';
   box.querySelectorAll('[data-copy]').forEach((b) => b.onclick = () => snack('已复制'));
-  box.querySelectorAll('[data-resend]').forEach((b, i) => b.onclick = () => { const s = sends[i]; sends.push({ t: s.t, to: 'Eric 的 MacBook Pro', at: '14:32', fresh: true }); renderSends(); });
+  box.querySelectorAll('[data-resend]').forEach((b, i) => b.onclick = () => { const s = sends[i]; if (s.err) sends.splice(i, 1); sends.push({ t: s.t, to: 'Eric 的 MacBook Pro', at: '14:32', fresh: true }); renderSends(); });
   requestAnimationFrame(() => { $('sendScroll').scrollTop = $('sendScroll').scrollHeight; });
 };
 const openSend = () => { show('send'); renderTarget(); renderSends(); };
@@ -1481,6 +1482,7 @@ const STATES = {
   'send-offline': () => { openSend(); renderTarget(true); sends.push({ t: spoken, err: '没有在线的电脑，文字已保留' }); renderSends(); },
   'send-timeout': () => { openSend(); sends.push({ t: spoken, err: '电脑没有响应' }); renderSends(); },
   'send-empty': () => { sends = []; openSend(); },
+  'send-net-off': () => { openSend(); $('sendOffline').hidden = false; $('hold3').parentElement.hidden = true; },
   profile: () => openProfile(),
   'profile-avatar': () => { avatar = samplePhoto; openProfile(); },
   'avatar-crop': () => startCrop(samplePhoto, () => zoomTo(1.3)),
@@ -1498,7 +1500,7 @@ const GROUPS = [
   ['整理', [['整理中', 'tidying'], ['整理完成', 'tidied'], ['没有待整理', 'tidy-empty'], ['整理失败', 'tidy-error']]],
   ['列表', [['文稿列表', 'list'], ['落选：毛玻璃', 'list-blur'], ['落选：扩展新建按钮', 'list-fab-wide'], ['只看天空色', 'list-sky'], ['筛选为空', 'list-filter-empty'], ['长按菜单', 'list-sheet'], ['重命名', 'rename'], ['删除后撤销', 'deleted'], ['没有文稿', 'list-empty']]],
   ['搜索', [['输入中', 'search-input'], ['搜索结果', 'search'], ['没有结果', 'search-empty'], ['正文命中', 'search-hit']]],
-  ['发送到电脑', [['头像菜单', 'user-menu'], ['发送到电脑', 'send'], ['切换电脑', 'send-targets'], ['录音中', 'send-rec'], ['上滑取消', 'send-cancel'], ['发送中', 'send-sending'], ['已发送', 'send-done'], ['没有在线的电脑', 'send-offline'], ['电脑没有响应', 'send-timeout'], ['没有记录', 'send-empty']]],
+  ['发送到电脑', [['头像菜单', 'user-menu'], ['发送到电脑', 'send'], ['切换电脑', 'send-targets'], ['录音中', 'send-rec'], ['上滑取消', 'send-cancel'], ['发送中', 'send-sending'], ['已发送', 'send-done'], ['没有在线的电脑', 'send-offline'], ['电脑没有响应', 'send-timeout'], ['没有记录', 'send-empty'], ['离线', 'send-net-off']]],
   ['我的', [['个人资料', 'profile'], ['已有头像', 'profile-avatar'], ['裁剪头像', 'avatar-crop'], ['保存中', 'avatar-saving'], ['保存失败', 'avatar-error'], ['设备', 'devices'], ['退出登录', 'logout']]],
 ];
 const dark = location.hash.slice(1).startsWith('dark');

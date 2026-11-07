@@ -593,7 +593,7 @@ private fun DocBar(m: AppModel, doc: Doc?, scrolled: Boolean, onMore: () -> Unit
 }
 
 @Composable
-private fun OfflineBar() {
+fun OfflineBar() {
     val p = Tokens.palette
     Row(
         Modifier

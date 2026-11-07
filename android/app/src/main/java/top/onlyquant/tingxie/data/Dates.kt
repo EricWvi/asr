@@ -64,6 +64,15 @@ fun usedAgo(at: Instant, nowI: Instant = Instant.now()): String {
     return "${monthDay(at, nowI)}使用"
 }
 
+/** When an online Mac last saw the user, e.g. 「3 分钟前有操作」. */
+fun activeAgo(at: Instant, nowI: Instant = Instant.now()): String {
+    val minutes = ChronoUnit.MINUTES.between(at, nowI)
+    if (minutes < 1) return "刚刚有操作"
+    if (minutes < 60) return "$minutes 分钟前有操作"
+    if (minutes < 24 * 60) return "${minutes / 60} 小时前有操作"
+    return "${dayDiff(local(at), local(nowI))} 天前有操作"
+}
+
 /** The day a device signed in, e.g. 「10 月 20 日登录」. */
 fun signedInOn(at: Instant, nowI: Instant = Instant.now()) = "${monthDay(at, nowI)}登录"
 

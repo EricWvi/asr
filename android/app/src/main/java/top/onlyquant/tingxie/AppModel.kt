@@ -22,6 +22,7 @@ import top.onlyquant.tingxie.data.Library
 import top.onlyquant.tingxie.data.LoginResult
 import top.onlyquant.tingxie.data.Me
 import top.onlyquant.tingxie.data.Prefs
+import top.onlyquant.tingxie.data.Sends
 import top.onlyquant.tingxie.data.Session
 import top.onlyquant.tingxie.data.defaultTitle
 import top.onlyquant.tingxie.data.exchangeCode
@@ -59,6 +60,8 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     var api by mutableStateOf<Api?>(null)
         private set
     lateinit var library: Library
+        private set
+    lateinit var sends: Sends
         private set
     var me by mutableStateOf<Me?>(null)
         private set
@@ -190,6 +193,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         val ctx = getApplication<Application>()
         library = Library(a, File(ctx.filesDir, "docs"), viewModelScope)
         library.onContent = tidier::onChange
+        sends = Sends(a, File(ctx.filesDir, "sends.json"), prefs, viewModelScope)
         api = a
         loginMsg = null
         stack.clear()
@@ -228,6 +232,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     private suspend fun endSession() {
         tidier.cancel()
         library.clear()
+        sends.clear()
         prefs.signOut()
         api = null
         me = null

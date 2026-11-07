@@ -91,6 +91,15 @@ private data class TidyLine(val type: String, val text: String = "", val message
 private data class AvatarSet(@SerialName("avatar_url") val avatarUrl: String)
 
 @Serializable
+private data class SendBody(val text: String, @SerialName("device_id") val deviceId: Long)
+
+@Serializable
+data class SentTo(val id: Long, val name: String)
+
+@Serializable
+private data class SendReply(val device: SentTo)
+
+@Serializable
 private data class ErrorBody(val error: String = "")
 
 @Serializable
@@ -184,6 +193,10 @@ class Api(val session: Session, private val onUnauthorized: () -> Unit) {
     }
 
     suspend fun devices(): List<Device> = get("/api/devices")
+
+    /** Inserts [text] at the cursor on a Mac (0 picks the one in use) and returns who took it. */
+    suspend fun send(text: String, deviceId: Long): SentTo =
+        json.decodeFromString<SendReply>(call("POST", "/api/send", SendBody(text, deviceId).body())).device
 
     /** Uploads a new avatar (the image's bytes) and returns its URL. */
     suspend fun setAvatar(image: ByteArray, type: String): String =

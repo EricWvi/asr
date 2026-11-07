@@ -25,6 +25,7 @@ class Prefs(private val context: Context) {
         val token = stringPreferencesKey("token")
         val deviceId = longPreferencesKey("device_id")
         val lastDoc = longPreferencesKey("last_doc")
+        val sendTarget = longPreferencesKey("send_target")
         val pendingState = stringPreferencesKey("pending_state")
         val pendingVerifier = stringPreferencesKey("pending_verifier")
         val pendingServer = stringPreferencesKey("pending_server")
@@ -53,6 +54,7 @@ class Prefs(private val context: Context) {
         it.remove(K.token)
         it.remove(K.deviceId)
         it.remove(K.lastDoc)
+        it.remove(K.sendTarget)
     }
 
     suspend fun lastDoc(): Long? = read()[K.lastDoc]
@@ -60,6 +62,11 @@ class Prefs(private val context: Context) {
     suspend fun setLastDoc(id: Long?) = context.store.edit {
         if (id == null) it.remove(K.lastDoc) else it[K.lastDoc] = id
     }
+
+    /** The Mac chosen for sending; 0 is 自动. */
+    suspend fun sendTarget(): Long = read()[K.sendTarget] ?: 0
+
+    suspend fun setSendTarget(id: Long) = context.store.edit { it[K.sendTarget] = id }
 
     // The browser round trip may outlive the process, so the PKCE secrets
     // wait on disk.
