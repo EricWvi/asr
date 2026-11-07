@@ -253,6 +253,19 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Replaces the avatar; throws if the server says no. */
+    suspend fun setAvatar(image: ByteArray, type: String) {
+        val a = api ?: return
+        val url = a.setAvatar(image, type)
+        me = me?.copy(avatarUrl = url)
+    }
+
+    suspend fun removeAvatar() {
+        val a = api ?: return
+        a.deleteAvatar()
+        me = me?.copy(avatarUrl = "")
+    }
+
     fun avatarUrl(): String? = me?.avatarUrl?.ifEmpty { null }?.let { (api?.server ?: server) + it }
 
     // ---------- navigation ----------

@@ -18,9 +18,11 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import top.onlyquant.tingxie.data.baseHttp
+import top.onlyquant.tingxie.ui.DevicesScreen
 import top.onlyquant.tingxie.ui.DocScreen
 import top.onlyquant.tingxie.ui.ListScreen
 import top.onlyquant.tingxie.ui.LoginScreen
+import top.onlyquant.tingxie.ui.ProfileScreen
 import top.onlyquant.tingxie.ui.SearchState
 import top.onlyquant.tingxie.ui.theme.TingxieTheme
 import top.onlyquant.tingxie.ui.theme.Tokens
@@ -77,6 +79,8 @@ fun App(m: AppModel) {
             when (val top = m.stack.lastOrNull()) {
                 Route.List, null -> saved.SaveableStateProvider("list") { ListScreen(m, search) }
                 is Route.Doc -> saved.SaveableStateProvider("doc-${top.id}") { DocScreen(m, top) }
+                Route.Profile -> ProfileScreen(m)
+                Route.Devices -> DevicesScreen(m)
                 else -> saved.SaveableStateProvider("list") { ListScreen(m, search) }
             }
         }

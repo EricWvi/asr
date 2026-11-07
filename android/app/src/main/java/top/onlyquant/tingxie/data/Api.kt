@@ -88,6 +88,9 @@ data class TidyRequest(val text: String, val headings: List<String>, val prefix:
 private data class TidyLine(val type: String, val text: String = "", val message: String = "")
 
 @Serializable
+private data class AvatarSet(@SerialName("avatar_url") val avatarUrl: String)
+
+@Serializable
 private data class ErrorBody(val error: String = "")
 
 @Serializable
@@ -181,6 +184,14 @@ class Api(val session: Session, private val onUnauthorized: () -> Unit) {
     }
 
     suspend fun devices(): List<Device> = get("/api/devices")
+
+    /** Uploads a new avatar (the image's bytes) and returns its URL. */
+    suspend fun setAvatar(image: ByteArray, type: String): String =
+        json.decodeFromString<AvatarSet>(call("PUT", "/api/me/avatar", image.toRequestBody(type.toMediaType()))).avatarUrl
+
+    suspend fun deleteAvatar() {
+        call("DELETE", "/api/me/avatar")
+    }
 
     /** The model may think for a while before writing; the server gives up after two minutes. */
     private val slow: OkHttpClient by lazy { http.newBuilder().readTimeout(150, TimeUnit.SECONDS).build() }
