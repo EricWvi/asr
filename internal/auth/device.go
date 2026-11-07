@@ -363,6 +363,8 @@ func (s *Service) devicePage(w http.ResponseWriter, status int, data devicePageD
 }
 
 // The look follows design/device-auth.html.
+// The card is centred by its own .page wrapper, not by body: browser
+// extensions (Automa, for one) append elements to body after load.
 var devicePageTmpl = template.Must(template.New("device").Parse(`<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><title>听 · 写 设备登录</title>
@@ -372,7 +374,8 @@ var devicePageTmpl = template.Must(template.New("device").Parse(`<!doctype html>
 @media (prefers-color-scheme:dark){:root{--bg:#1b1b1d;--surface:#2a2a2d;--ink:#f2f2f4;--ink-2:#a0a0a7;--line:#3a3a3e;--chip:#36363a;--accent:#3b8ef7;
 --shadow-sm:0 1px 2px rgb(0 0 0/.3);--shadow-md:0 1px 2px rgb(0 0 0/.3),0 12px 32px -10px rgb(0 0 0/.5)}.brand-mark{background:var(--chip)!important}}
 *{box-sizing:border-box}html,body{height:100%;margin:0}
-body{display:grid;place-items:center;padding:24px;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.page{min-height:100%;display:grid;place-items:center;padding:24px}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}button:focus:not(:focus-visible){outline:none}
 svg{display:block}.icon{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 .card{width:100%;max-width:380px;padding:28px 28px 24px;border-radius:20px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line),var(--shadow-md)}
@@ -396,7 +399,7 @@ h1{margin:0 0 16px;font-size:18px;font-weight:600;line-height:1.4}
 .result h1{margin-bottom:6px}.result p{margin:0;font-size:13px;color:var(--ink-2)}
 .result p a{color:var(--accent);text-decoration:none}.result p a:hover{text-decoration:underline}
 </style></head><body>
-<main class="card">
+<div class="page"><main class="card">
 <div class="brand"><div class="brand-mark"><svg class="logo" viewBox="0 1 398 383"><path fill="#fde8a7" d="M0.0 123.5A58.5 58.5 0 0 1 35.3 69.8L186.1 4.6A45.8 45.8 0 0 1 250.0 46.6L250.0 334.3A49.8 49.8 0 0 1 183.5 381.2L36.5 328.6A55.0 55.0 0 0 1 0.0 276.8Z"/><path fill="#fec6ab" d="M264.8 48.8A9.8 9.8 0 0 1 274.5 39.0L281.0 39.0A46.0 46.0 0 0 1 327.0 85.0L327.0 298.8A46.0 46.0 0 0 1 281.0 344.8L274.5 344.8A9.8 9.8 0 0 1 264.8 335.0Z"/><path fill="#bcc6fa" d="M341.8 87.0A8.2 8.2 0 0 1 350.0 78.8L355.2 78.8A42.5 42.5 0 0 1 397.8 121.2L397.8 259.8A42.5 42.5 0 0 1 355.2 302.2L350.0 302.2A8.2 8.2 0 0 1 341.8 294.0Z"/><path fill="#f5c258" d="M57.6 132.4L179.6 116.2A20.0 20.0 0 1 1 183.8 155.9L61.0 165.2A16.5 16.5 0 0 1 57.6 132.4Z"/><path fill="#f5c258" d="M59.1 184.8L154.8 183.8A18.5 18.5 0 1 1 154.3 220.7L58.7 217.2A16.2 16.2 0 0 1 59.1 184.8Z"/><path fill="#f5c258" d="M60.9 238.3L99.7 241.0A17.0 17.0 0 1 1 96.9 274.9L58.2 271.2A16.5 16.5 0 0 1 60.9 238.3Z"/></svg></div><div class="brand-name" aria-label="听·写"><span aria-hidden="true">听</span><span class="brand-dot" aria-hidden="true"></span><span aria-hidden="true">写</span></div></div>
 {{if eq .Kind "ask"}}
 <h1>允许这台设备登录？</h1>
@@ -421,4 +424,4 @@ h1{margin:0 0 16px;font-size:18px;font-weight:600;line-height:1.4}
 <section class="result"><div class="mark"><svg class="icon" viewBox="0 0 24 24">{{if eq .Kind "expired"}}<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>{{else}}<path d="M6 6l12 12M18 6L6 18"/>{{end}}</svg></div>
 <h1>{{.Title}}</h1><p>{{.Message}}</p></section>
 {{end}}
-</main></body></html>`))
+</main></div></body></html>`))

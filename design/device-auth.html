@@ -43,11 +43,12 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body {
-  display: grid; place-items: center; padding: 24px;
   background: var(--bg); color: var(--ink);
   font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+/* 居中交给自己的容器：浏览器扩展（如 Automa）会往 body 里追加元素，不能让它们参与卡片的布局 */
+.page { min-height: 100%; display: grid; place-items: center; padding: 24px; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 button:focus:not(:focus-visible) { outline: none; }
 a { color: inherit; }
@@ -149,7 +150,7 @@ h1 { margin: 0 0 16px; font-size: 18px; font-weight: 600; line-height: 1.4; }
   <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
 </svg>
 
-<main class="card">
+<div class="page"><main class="card">
   <div class="brand"><div class="brand-mark"><svg class="icon"><use href="#i-mic"/></svg></div><div class="brand-name" aria-label="听·写"><span aria-hidden="true">听</span><span class="brand-dot" aria-hidden="true"></span><span aria-hidden="true">写</span></div></div>
 
   <section id="ask">
@@ -186,7 +187,7 @@ h1 { margin: 0 0 16px; font-size: 18px; font-weight: 600; line-height: 1.4; }
     <h1>登录已过期</h1>
     <p>请回到应用重新登录</p>
   </section>
-</main>
+</main></div>
 
 <script>
 // 原型交互：允许、取消只切换显示。
