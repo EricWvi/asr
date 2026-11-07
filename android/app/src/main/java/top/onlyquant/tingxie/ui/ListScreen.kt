@@ -66,6 +66,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import top.onlyquant.tingxie.AppModel
 import top.onlyquant.tingxie.Route
@@ -295,7 +296,10 @@ private fun DocList(m: AppModel, search: SearchState, onLong: (Doc) -> Unit, pre
                     DocRow(d, search.words, pressed = pressedId == d.id, onClick = { m.open(d.id, search.words) }, onLong = { onLong(d) })
                 }
             } else {
-                val groups = shown.groupBy { groupLabel(it.updated) }
+                // Pinned first, the most recently pinned on top, then the rest by last update.
+                val pinned = shown.filter { it.pinnedAt != null }.sortedByDescending { it.pinned }
+                val groups = (if (pinned.isEmpty()) emptyMap() else mapOf("置顶" to pinned)) +
+                    shown.filter { it.pinnedAt == null }.groupBy { groupLabel(it.updated) }
                 for ((label, docs) in groups) {
                     stickyHeader(key = "g-$label") { GroupHeader(label) }
                     items(docs, key = { it.id }) { d ->
@@ -442,6 +446,18 @@ private fun DocSheet(m: AppModel, d: Doc, onDismiss: () -> Unit, onRename: () ->
                     color = name
                     if (name != d.color) m.library.edit(d.id, DocPatch(color = name))
                     onDismiss()
+                }
+            }
+        }
+        MenuItem(if (d.pinnedAt != null) Icons.PinOff else Icons.Pin, if (d.pinnedAt != null) "取消置顶" else "置顶", height = 52.dp, gap = 16.dp) {
+            onDismiss()
+            // Outlives the sheet, whose scope ends as it closes.
+            if (!m.online) m.toast("离线，只能查看")
+            else m.viewModelScope.launch {
+                try {
+                    m.library.setPinned(d.id, d.pinnedAt == null)
+                } catch (e: Exception) {
+                    m.toast(e.userMessage())
                 }
             }
         }

@@ -16,6 +16,8 @@ export type DocSummary = {
   snippet?: string;
   created_at: string;
   updated_at: string;
+  /** When it was pinned to the top of the list; absent when it is not pinned. */
+  pinned_at?: string;
 };
 
 /** [from, to) offsets into a document's content. */
@@ -100,6 +102,8 @@ export const api = {
   /** keepalive lets a small save finish while the page unloads. */
   updateDocument: (id: number, patch: DocPatch, keepalive = false) =>
     request<DocSummary>("PATCH", `/api/documents/${id}`, patch, keepalive),
+  /** Pinning a pinned document keeps its time, so it keeps its place. */
+  pinDocument: (id: number, pinned: boolean) => request<DocSummary>("PATCH", `/api/documents/${id}`, { pinned }),
   deleteDocument: (id: number) => request<null>("DELETE", `/api/documents/${id}`),
   restoreDocument: (id: number) => request<null>("POST", `/api/documents/${id}/restore`),
   devices: () => request<Device[]>("GET", "/api/devices"),

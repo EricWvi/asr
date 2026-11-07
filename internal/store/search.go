@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"slices"
 	"strings"
 	"time"
@@ -52,7 +53,7 @@ func (s *Store) SearchDocuments(ctx context.Context, userID int64, query string)
 	}
 
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT d.id, d.title, d.color, d.content, d.created_at, d.updated_at
+		SELECT d.id, d.title, d.color, d.content, d.created_at, d.updated_at, d.pinned_at
 		FROM documents d
 		WHERE `+strings.Join(where, " AND ")+`
 		ORDER BY d.updated_at DESC, d.id DESC`, args...)
@@ -65,10 +66,12 @@ func (s *Store) SearchDocuments(ctx context.Context, userID int64, query string)
 		var d Document
 		var content string
 		var created, updated int64
-		if err := rows.Scan(&d.ID, &d.Title, &d.Color, &content, &created, &updated); err != nil {
+		var pinned sql.NullInt64
+		if err := rows.Scan(&d.ID, &d.Title, &d.Color, &content, &created, &updated, &pinned); err != nil {
 			return nil, err
 		}
 		d.CreatedAt, d.UpdatedAt = time.UnixMilli(created), time.UnixMilli(updated)
+		d.PinnedAt = pinnedAt(pinned)
 		d.Snippet = hitSnippet(content, words)
 		if slices.ContainsFunc(words, func(w string) bool { return indexFold(d.Title, w) >= 0 }) {
 			inTitle = append(inTitle, d)

@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { CopyIcon, DownloadIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { CopyIcon, DownloadIcon, PencilIcon, PinIcon, PinOffIcon, Trash2Icon } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
@@ -16,12 +16,16 @@ import { groupLabel } from "@/lib/dates";
 import { focusEditor } from "@/lib/editor-focus";
 import { notify, notifyError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { deleteDocument, documentMarkdown, edit, openDocument, useWorkspace } from "@/lib/workspace";
+import { deleteDocument, documentMarkdown, edit, openDocument, setPinned, useWorkspace } from "@/lib/workspace";
 
 const groupHead = "sticky top-0 z-1 bg-bg px-2.5 pt-3 pb-1 text-[11.5px] text-ink-3";
 const emptyNote = "px-2.5 py-6 text-center text-[12.5px] text-ink-3";
 
-/** The sidebar list: documents by last update, or search results while the search box holds words. */
+/**
+ * The sidebar list: pinned documents first, the most recently pinned on
+ * top, then the rest by last update; or search results while the search
+ * box holds words.
+ */
 export function DocList() {
   const query = useWorkspace((s) => s.query.trim());
   const nav = useRef<HTMLElement>(null);
@@ -60,9 +64,11 @@ function Groups({ onCount }: { onCount: (n: number) => void }) {
   const shown = filter ? docs.filter((d) => d.color === filter) : docs;
   useLayoutEffect(() => onCount(shown.length), [shown.length]);
 
-  const groups: { label: string; docs: DocSummary[] }[] = [];
+  const pinned = shown.filter((d) => d.pinned_at).toSorted((a, b) => b.pinned_at!.localeCompare(a.pinned_at!));
+  const groups: { label: string; docs: DocSummary[] }[] = pinned.length ? [{ label: "置顶", docs: pinned }] : [];
   const now = new Date();
   for (const d of shown) {
+    if (d.pinned_at) continue;
     const label = groupLabel(new Date(d.updated_at), now);
     const last = groups.at(-1);
     if (last?.label === label) last.docs.push(d);
@@ -180,6 +186,10 @@ function DocItem({ doc, hits }: { doc: DocSummary; hits?: string[] }) {
         </Row>
       </ContextMenuTrigger>
       <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
+        <ContextMenuItem onSelect={() => void setPinned(doc.id, !doc.pinned_at)}>
+          {doc.pinned_at ? <PinOffIcon /> : <PinIcon />}
+          {doc.pinned_at ? "取消置顶" : "置顶"}
+        </ContextMenuItem>
         <ContextMenuItem onSelect={() => useWorkspace.setState({ renamingId: doc.id })}>
           <PencilIcon />
           重命名

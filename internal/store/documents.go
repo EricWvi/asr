@@ -43,6 +43,18 @@ type Document struct {
 	TidyRanges []Range   `json:"tidy_ranges,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+	// PinnedAt is when the document was pinned; nil when it is not.
+	// Clients list pinned documents first, the most recently pinned on top.
+	PinnedAt *time.Time `json:"pinned_at,omitempty"`
+}
+
+// pinnedAt reads the nullable pinned_at column.
+func pinnedAt(ms sql.NullInt64) *time.Time {
+	if !ms.Valid {
+		return nil
+	}
+	t := time.UnixMilli(ms.Int64)
+	return &t
 }
 
 // Range is a span [from, to) of a document's content, in UTF-16 code units
@@ -55,6 +67,9 @@ type DocumentPatch struct {
 	Color      *string  `json:"color"`
 	Content    *string  `json:"content"`
 	TidyRanges *[]Range `json:"tidy_ranges"`
+	// Pinned pins or unpins the document. Pinning one already pinned
+	// keeps its place.
+	Pinned *bool `json:"pinned"`
 }
 
 // CreateDocument adds a document for the user. An empty title falls back
@@ -95,7 +110,7 @@ func (s *Store) CreateDocument(ctx context.Context, userID int64, title, color s
 func (s *Store) ListDocuments(ctx context.Context, userID int64) ([]Document, error) {
 	// The snippet only needs the start of the content.
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, title, color, substr(content, 1, 400), created_at, updated_at
+		SELECT id, title, color, substr(content, 1, 400), created_at, updated_at, pinned_at
 		FROM documents
 		WHERE user_id = ? AND deleted_at IS NULL
 		ORDER BY updated_at DESC, id DESC`, userID)
@@ -108,11 +123,13 @@ func (s *Store) ListDocuments(ctx context.Context, userID int64) ([]Document, er
 		var d Document
 		var head string
 		var created, updated int64
-		if err := rows.Scan(&d.ID, &d.Title, &d.Color, &head, &created, &updated); err != nil {
+		var pinned sql.NullInt64
+		if err := rows.Scan(&d.ID, &d.Title, &d.Color, &head, &created, &updated, &pinned); err != nil {
 			return nil, err
 		}
 		d.Snippet = Snippet(head)
 		d.CreatedAt, d.UpdatedAt = time.UnixMilli(created), time.UnixMilli(updated)
+		d.PinnedAt = pinnedAt(pinned)
 		docs = append(docs, d)
 	}
 	return docs, rows.Err()
@@ -123,11 +140,12 @@ func (s *Store) GetDocument(ctx context.Context, userID, id int64) (Document, er
 	var d Document
 	var ranges string
 	var created, updated int64
+	var pinned sql.NullInt64
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, title, color, content, tidy_ranges, created_at, updated_at
+		SELECT id, title, color, content, tidy_ranges, created_at, updated_at, pinned_at
 		FROM documents
 		WHERE id = ? AND user_id = ? AND deleted_at IS NULL`, id, userID).
-		Scan(&d.ID, &d.Title, &d.Color, &d.Content, &ranges, &created, &updated)
+		Scan(&d.ID, &d.Title, &d.Color, &d.Content, &ranges, &created, &updated, &pinned)
 	if errors.Is(err, sql.ErrNoRows) {
 		return d, ErrNotFound
 	}
@@ -138,12 +156,13 @@ func (s *Store) GetDocument(ctx context.Context, userID, id int64) (Document, er
 		return d, fmt.Errorf("document %d: tidy_ranges: %w", id, err)
 	}
 	d.CreatedAt, d.UpdatedAt = time.UnixMilli(created), time.UnixMilli(updated)
+	d.PinnedAt = pinnedAt(pinned)
 	return d, nil
 }
 
 // UpdateDocument applies the patch and returns the document without its
 // content. The last write wins. Changing the title or content moves the
-// document to the top of the list; changing the color does not.
+// document to the top of the list; changing the color or pinning does not.
 func (s *Store) UpdateDocument(ctx context.Context, userID, id int64, p DocumentPatch) (Document, error) {
 	var sets []string
 	var args []any
@@ -177,6 +196,13 @@ func (s *Store) UpdateDocument(ctx context.Context, userID, id int64, p Document
 		}
 		sets, args = append(sets, "tidy_ranges = ?"), append(args, string(raw))
 	}
+	if p.Pinned != nil {
+		if *p.Pinned {
+			sets, args = append(sets, "pinned_at = coalesce(pinned_at, ?)"), append(args, time.Now().UnixMilli())
+		} else {
+			sets = append(sets, "pinned_at = NULL")
+		}
+	}
 	if touch {
 		sets, args = append(sets, "updated_at = ?"), append(args, time.Now().UnixMilli())
 	}
@@ -187,17 +213,19 @@ func (s *Store) UpdateDocument(ctx context.Context, userID, id int64, p Document
 	var d Document
 	var head string
 	var created, updated int64
+	var pinned sql.NullInt64
 	err := s.db.QueryRowContext(ctx, `
 		UPDATE documents SET `+strings.Join(sets, ", ")+`
 		WHERE id = ? AND user_id = ? AND deleted_at IS NULL
-		RETURNING id, title, color, substr(content, 1, 400), created_at, updated_at`,
+		RETURNING id, title, color, substr(content, 1, 400), created_at, updated_at, pinned_at`,
 		append(args, id, userID)...).
-		Scan(&d.ID, &d.Title, &d.Color, &head, &created, &updated)
+		Scan(&d.ID, &d.Title, &d.Color, &head, &created, &updated, &pinned)
 	if errors.Is(err, sql.ErrNoRows) {
 		return d, ErrNotFound
 	}
 	d.Snippet = Snippet(head)
 	d.CreatedAt, d.UpdatedAt = time.UnixMilli(created), time.UnixMilli(updated)
+	d.PinnedAt = pinnedAt(pinned)
 	return d, err
 }
 

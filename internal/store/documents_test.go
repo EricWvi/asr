@@ -221,3 +221,46 @@ func TestTidyRangesKeptWithContent(t *testing.T) {
 		}
 	}
 }
+
+func TestPinDocument(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	uid := newUser(t, s, "alice")
+	d, err := s.CreateDocument(ctx, uid, "周末", "mint")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pinned, err := s.UpdateDocument(ctx, uid, d.ID, DocumentPatch{Pinned: ptr(true)})
+	if err != nil || pinned.PinnedAt == nil {
+		t.Fatalf("pin: doc = %+v, err = %v", pinned, err)
+	}
+	if !pinned.UpdatedAt.Equal(d.UpdatedAt) {
+		t.Errorf("pinning moved updated_at from %v to %v", d.UpdatedAt, pinned.UpdatedAt)
+	}
+
+	// Pinning again keeps the original time, so the document keeps its place.
+	time.Sleep(2 * time.Millisecond)
+	again, err := s.UpdateDocument(ctx, uid, d.ID, DocumentPatch{Pinned: ptr(true)})
+	if err != nil || again.PinnedAt == nil || !again.PinnedAt.Equal(*pinned.PinnedAt) {
+		t.Fatalf("pin again: pinned_at = %v, want %v (err %v)", again.PinnedAt, pinned.PinnedAt, err)
+	}
+
+	list, err := s.ListDocuments(ctx, uid)
+	if err != nil || len(list) != 1 || list[0].PinnedAt == nil {
+		t.Fatalf("list = %+v, err = %v", list, err)
+	}
+	got, err := s.GetDocument(ctx, uid, d.ID)
+	if err != nil || got.PinnedAt == nil {
+		t.Fatalf("get = %+v, err = %v", got, err)
+	}
+	found, err := s.SearchDocuments(ctx, uid, "周末")
+	if err != nil || len(found) != 1 || found[0].PinnedAt == nil {
+		t.Fatalf("search = %+v, err = %v", found, err)
+	}
+
+	unpinned, err := s.UpdateDocument(ctx, uid, d.ID, DocumentPatch{Pinned: ptr(false)})
+	if err != nil || unpinned.PinnedAt != nil {
+		t.Fatalf("unpin: doc = %+v, err = %v", unpinned, err)
+	}
+}

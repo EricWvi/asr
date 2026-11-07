@@ -4,7 +4,7 @@ import { api, type Doc, type DocColor, type DocPatch, type DocSummary } from "@/
 import { defaultTitle } from "@/lib/dates";
 import { focusEditor } from "@/lib/editor-focus";
 import { queryClient } from "@/lib/query";
-import { discard, docKey, editDocument, flush, isDirty, listKey } from "@/lib/save-queue";
+import { discard, docKey, editDocument, flush, isDirty, listKey, patchSummary } from "@/lib/save-queue";
 import { dismiss, notify, notifyError } from "@/lib/toast";
 
 const CURRENT_KEY = "asr:current";
@@ -64,6 +64,27 @@ export function edit(id: number, patch: DocPatch) {
   const { draftId } = useWorkspace.getState();
   if (id === draftId && (patch.title !== undefined || patch.content)) useWorkspace.setState({ draftId: null });
   editDocument(id, patch);
+}
+
+/**
+ * Pins or unpins a document. It moves at once and saves straight away,
+ * apart from the save queue; a failure puts it back. Pinning a new draft
+ * keeps it.
+ */
+export async function setPinned(id: number, pinned: boolean) {
+  const before = list().find((d) => d.id === id)?.pinned_at;
+  const apply = (pinned_at: string | undefined) => {
+    patchSummary(id, { pinned_at });
+    queryClient.setQueryData<Doc>(docKey(id), (d) => d && { ...d, pinned_at });
+  };
+  if (pinned && id === useWorkspace.getState().draftId) useWorkspace.setState({ draftId: null });
+  apply(pinned ? (before ?? new Date().toISOString()) : undefined);
+  try {
+    apply((await api.pinDocument(id, pinned)).pinned_at);
+  } catch (err) {
+    apply(before);
+    notifyError(err, pinned ? "置顶失败" : "取消置顶失败");
+  }
 }
 
 /** Throws away the open document if it is a draft nobody wrote in. */

@@ -55,8 +55,11 @@ data class Doc(
     @SerialName("tidy_ranges") val tidyRanges: List<List<Int>> = emptyList(),
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String,
+    /** When it was pinned to the top of the list; null when it is not pinned. */
+    @SerialName("pinned_at") val pinnedAt: String? = null,
 ) {
     val updated: Instant get() = java.time.OffsetDateTime.parse(updatedAt).toInstant()
+    val pinned: Instant? get() = pinnedAt?.let { java.time.OffsetDateTime.parse(it).toInstant() }
 }
 
 @Serializable
@@ -104,6 +107,9 @@ private data class ErrorBody(val error: String = "")
 
 @Serializable
 private data class NewDoc(val title: String, val color: String? = null)
+
+@Serializable
+private data class PinBody(val pinned: Boolean)
 
 @Serializable
 private data class TokenRequest(val code: String, @SerialName("code_verifier") val verifier: String)
@@ -189,6 +195,10 @@ class Api(val session: Session, private val onUnauthorized: () -> Unit) {
 
     suspend fun update(id: Long, patch: DocPatch): Doc =
         json.decodeFromString(call("PATCH", "/api/documents/$id", patch.body()))
+
+    /** Pinning a pinned document keeps its time, so it keeps its place. */
+    suspend fun pin(id: Long, pinned: Boolean): Doc =
+        json.decodeFromString(call("PATCH", "/api/documents/$id", PinBody(pinned).body()))
 
     suspend fun delete(id: Long) {
         call("DELETE", "/api/documents/$id")

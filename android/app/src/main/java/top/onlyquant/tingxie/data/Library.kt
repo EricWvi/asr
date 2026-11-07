@@ -199,6 +199,25 @@ class Library(private val api: Api, private val dir: File, private val scope: Co
         write("pending.json", pending.toMap())
     }
 
+    /**
+     * Pins or unpins a document. It moves at once and saves straight away,
+     * apart from the save queue; a failure puts it back and throws.
+     */
+    suspend fun setPinned(id: Long, pinned: Boolean) {
+        val before = list?.find { it.id == id }?.pinnedAt
+        fun apply(at: String?) {
+            docs[id]?.let { docs[id] = it.copy(pinnedAt = at) }
+            list?.let { l -> putList(l.map { if (it.id == id) it.copy(pinnedAt = at) else it }) }
+        }
+        apply(if (pinned) before ?: Instant.now().toString() else null)
+        try {
+            apply(api.pin(id, pinned).pinnedAt)
+        } catch (e: Exception) {
+            apply(before)
+            throw e
+        }
+    }
+
     suspend fun delete(id: Long) {
         discard(id)
         api.delete(id)

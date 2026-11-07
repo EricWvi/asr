@@ -112,6 +112,11 @@ var migrations = []migration{
 	-- The ID of the uploaded avatar; its file is avatars/<user>/<id>.
 	ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT '';
 	`),
+	execSQL(`
+	-- When the document was pinned to the top of the list, in Unix
+	-- milliseconds; NULL when it is not pinned.
+	ALTER TABLE documents ADD COLUMN pinned_at INTEGER;
+	`),
 }
 
 func migrate(db *sql.DB) error {
