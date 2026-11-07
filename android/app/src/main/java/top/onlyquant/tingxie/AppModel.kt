@@ -150,8 +150,18 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Back from the browser without a callback: the tab was closed. */
+    /**
+     * Back in the app: re-read the list and the open document, which another
+     * device may have changed meanwhile. Back from the browser without a
+     * callback: the sign-in tab was closed.
+     */
     fun onResume() {
+        if (api != null) {
+            refresh()
+            (stack.lastOrNull() as? Route.Doc)?.let { r ->
+                viewModelScope.launch { library.reload(r.id) { voice.phase == top.onlyquant.tingxie.voice.Phase.Idle } }
+            }
+        }
         if (!awaitingBrowser) return
         viewModelScope.launch {
             // A callback, if any, is delivered just before this.

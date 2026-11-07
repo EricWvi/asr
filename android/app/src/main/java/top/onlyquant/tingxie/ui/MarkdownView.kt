@@ -191,6 +191,8 @@ fun MarkdownView(
 
     Markdown(
         content = content,
+        flavour = flavour,
+        parser = parser,
         colors = colors,
         typography = typography,
         padding = markdownPadding(block = 0.dp, list = 0.dp, listItemTop = 2.dp, listItemBottom = 2.dp, listIndent = 0.dp),
@@ -226,6 +228,10 @@ fun MarkdownView(
         },
     )
 }
+
+/** One flavour and parser for every view, so a recomposition does not parse again. */
+private val flavour = CjkFlavour()
+private val parser = org.intellij.markdown.parser.MarkdownParser(flavour, cancellationToken = org.intellij.markdown.parser.CancellationToken.NonCancellable)
 
 /** A style or a drawn decoration over [from, to) of the source. */
 data class Overlay(val from: Int, val to: Int, val style: SpanStyle? = null, val tag: String? = null, val item: String = "")

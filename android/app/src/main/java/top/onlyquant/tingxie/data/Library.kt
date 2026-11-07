@@ -96,6 +96,25 @@ class Library(private val api: Api, private val dir: File, private val scope: Co
         return d
     }
 
+    /**
+     * Reads an open document again in case another device changed it, and
+     * shows that version if so (frontend/src/lib/remote-edits.ts). Nothing
+     * happens while this device has edits of its own on their way, or while
+     * [quiet] says something else is writing into it.
+     */
+    suspend fun reload(id: Long, quiet: () -> Boolean): Boolean {
+        val cached = docs[id] ?: return false
+        if (dirty(id) || !quiet()) return false
+        // Deleted elsewhere or offline: the list refresh deals with the former.
+        val d = runCatching { api.document(id) }.getOrNull() ?: return false
+        // Any local edit meanwhile replaced the cached copy.
+        if (dirty(id) || !quiet() || docs[id] !== cached) return false
+        if (d.content == cached.content && d.tidyRanges == cached.tidyRanges && d.title == cached.title && d.color == cached.color) return false
+        docs[id] = d
+        write("doc-$id.json", d)
+        return true
+    }
+
     /** Applies an edit locally and schedules saving it. Colours save at once. */
     fun edit(id: Long, patch: DocPatch) {
         docs[id]?.let { docs[id] = it.apply(patch) }

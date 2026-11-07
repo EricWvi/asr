@@ -80,7 +80,6 @@ import top.onlyquant.tingxie.data.ApiError
 import top.onlyquant.tingxie.data.Doc
 import top.onlyquant.tingxie.data.DocPatch
 import top.onlyquant.tingxie.data.SaveStatus
-import top.onlyquant.tingxie.data.countWords
 import top.onlyquant.tingxie.data.fitting
 import top.onlyquant.tingxie.data.mapped
 import top.onlyquant.tingxie.data.plus
@@ -588,14 +587,11 @@ private fun Chip(content: @Composable () -> Unit) {
 @Composable
 private fun ChipText(text: String, color: Color = Tokens.palette.ink.copy(alpha = .62f)) = Text(text, color = color, fontSize = 12.5.sp)
 
-/** The colour dot, edit time, word count and save state under the title. */
+/** The colour dot, edit time and save state under the title. */
 @Composable
 private fun Meta(m: AppModel, doc: Doc, onDot: () -> Unit) {
     val p = Tokens.palette
     val status = m.library.status[doc.id]
-    // The count follows what is saved, so it stays still while typing.
-    var counted by remember(doc.id) { mutableStateOf(doc.content) }
-    if (status == null && counted != doc.content) counted = doc.content
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier.size(26.dp).clip(RoundedCornerShape(7.dp)).background(p.well).pressable(RoundedCornerShape(7.dp), onClick = onDot),
@@ -604,7 +600,6 @@ private fun Meta(m: AppModel, doc: Doc, onDot: () -> Unit) {
             Box(Modifier.size(13.dp).clip(CircleShape).background(p.tint(doc.color).base).border(1.dp, Color.Black.copy(alpha = .12f), CircleShape))
         }
         Chip { ChipText(shortTime(doc.updated)) }
-        Chip { ChipText("${countWords(counted)} 字") }
         Chip {
             when {
                 !m.online -> {
@@ -612,7 +607,7 @@ private fun Meta(m: AppModel, doc: Doc, onDot: () -> Unit) {
                     ChipText("离线")
                 }
                 status == SaveStatus.Error -> ChipText("保存失败", p.rec)
-                status == SaveStatus.Saving -> ChipText("保存中…")
+                status == SaveStatus.Saving -> ChipText("保存中")
                 else -> ChipText("已保存")
             }
         }

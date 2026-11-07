@@ -201,7 +201,10 @@ fun continueList(old: String, new: String, cursor: Int): Pair<String, Int>? {
     val m = listItem.find(line) ?: return null
     if (m.range.first != 0) return null
     val rest = line.substring(m.range.last + 1)
-    if (rest.isBlank()) {
+    // Right before an item's text: the text moves down as a new item and an
+    // empty one stays above, as on the web (editor/lists.ts splitAtItemStart).
+    val after = new.substring(cursor).substringBefore('\n')
+    if (rest.isBlank() && after.isBlank()) {
         // An empty item: drop its marker and end the list.
         val s = new.substring(0, lineStart) + new.substring(cursor)
         return s to lineStart

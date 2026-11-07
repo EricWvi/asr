@@ -278,13 +278,17 @@ private fun DocList(m: AppModel, search: SearchState, onLong: (Doc) -> Unit, pre
     val all = m.library.list
     val shown = (results ?: all ?: emptyList()).filter { filter == null || it.color == filter }
     val bottom = PaddingValues(start = 8.dp, end = 8.dp, bottom = 170.dp)
+    val state = androidx.compose.foundation.lazy.rememberLazyListState()
+    // At the very top, stay there when documents arrive above (a refresh,
+    // one from another device); otherwise the list keeps the row in view.
+    if (state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0) state.requestScrollToItem(0)
 
     when {
         results != null && shown.isEmpty() -> Empty("没有找到「${search.words.joinToString(" ")}」", modifier)
         results == null && all == null -> Box(modifier)
         results == null && all!!.isEmpty() -> Empty("还没有文稿", modifier)
         shown.isEmpty() -> Empty("没有这种颜色的文稿", modifier)
-        else -> LazyColumn(modifier.fillMaxWidth(), contentPadding = bottom) {
+        else -> LazyColumn(modifier.fillMaxWidth(), state = state, contentPadding = bottom) {
             if (results != null) {
                 stickyHeader { GroupHeader("找到 ${shown.size} 篇") }
                 items(shown, key = { it.id }) { d ->

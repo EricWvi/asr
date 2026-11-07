@@ -745,7 +745,7 @@ svg { display: block; }
         <h1 class="title" id="docTitle">2026/10/24 14:32</h1>
         <div class="meta">
           <button class="dot-btn" id="dotBtn"><span></span></button>
-          <span class="chip">今天 14:32</span><span class="chip" id="wordChip">612 字</span><span class="chip" id="syncChip">已保存</span>
+          <span class="chip">今天 14:32</span><span class="chip" id="syncChip">已保存</span>
           <div class="palette" id="palette" hidden></div>
         </div>
       </div>
@@ -1129,7 +1129,6 @@ const newDoc = () => {
   const d = { id: 99, g: '今天', t: '2026/10/25 09:12', s: '', c: 'sky' };
   openDoc(d);
   $('view').innerHTML = '<p class="placeholder" id="lastP">按住说话，或点这里输入</p>';
-  $('wordChip').textContent = '0 字';
   bindView(); syncTidy();
 };
 docScroll.addEventListener('scroll', () => { doc.classList.toggle('scrolled', docScroll.scrollTop > 60); });
