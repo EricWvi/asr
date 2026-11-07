@@ -9,6 +9,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         menu = MenuController(model: model)
         model.start()
+        // Development only: TINGXIE_DEMO=1 fills the recent inserts and opens
+        // the menu, so its layout can be screenshotted.
+        if ProcessInfo.processInfo.environment["TINGXIE_DEMO"] == "1" {
+            model.seedDemo()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.menu?.open() }
+        }
     }
 }
 

@@ -34,7 +34,7 @@ final class AppModel {
         initLaunchAtLogin()
         trusted = inserter.trusted
         if !trusted { watchPermission() }
-        if let s = Keychain.load() {
+        if let s = SessionStore.load() {
             signedIn(s, fresh: false)
         }
         onChange()
@@ -55,7 +55,7 @@ final class AppModel {
             defer { login = nil }
             do {
                 let s = try await flow.run(server: Settings.server)
-                guard Keychain.save(s) else {
+                guard SessionStore.save(s) else {
                     phase = .loggedOut(message: "无法保存登录信息")
                     onChange()
                     return
@@ -123,7 +123,7 @@ final class AppModel {
         session = nil
         me = nil
         recent.clear()
-        Keychain.delete()
+        SessionStore.delete()
         phase = .loggedOut(message: message)
         onChange()
     }
@@ -157,6 +157,14 @@ final class AppModel {
         watchPermission()
         onChange()
         return error
+    }
+
+    func seedDemo() {
+        let now = Date()
+        for (i, t) in ["这次应该返回成功。", "换行之后。", "恢复后正常插入。", "正常插入。", "帮我把周五的会议改到下午三点，顺便通知一下设计组的同事。"].enumerated() {
+            recent.add(t, at: now.addingTimeInterval(Double(i - 5) * 300))
+        }
+        onChange()
     }
 
     func copyRecent(_ index: Int) {

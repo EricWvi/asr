@@ -42,11 +42,41 @@ final class MenuController: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) { build() }
 
+    func open() { item.button?.performClick(nil) }
+
     // MARK: Building
+
+    /// Recent inserts, whose times are aligned once the menu is built.
+    private var timed: [(item: NSMenuItem, text: String, time: String)] = []
 
     private func build() {
         menu.removeAllItems()
+        timed = []
         if model.session == nil { buildSignedOut() } else { buildSignedIn() }
+        alignTimes()
+    }
+
+    /// Puts the times flush with the right edge of the menu. The menu is as
+    /// wide as its widest item, and how NSMenu lays out its columns is not
+    /// documented, so the tab stop is pushed right for as long as the menu
+    /// does not grow.
+    private func alignTimes() {
+        guard !timed.isEmpty else { return }
+        func set(_ tab: CGFloat) {
+            for t in timed { t.item.attributedTitle = withTime(t.text, t.time, tab: tab) }
+        }
+        let font = NSFont.menuFont(ofSize: 0)
+        let width = { (s: String) in (s as NSString).size(withAttributes: [.font: font]).width }
+        var lo = ceil(timed.map { width($0.text) + 24 + width($0.time) }.max()!)
+        set(lo)
+        let base = menu.size.width
+        var hi = lo + 600
+        while hi - lo > 0.5 {
+            let mid = (lo + hi) / 2
+            set(mid)
+            if menu.size.width > base { hi = mid } else { lo = mid }
+        }
+        set(floor(lo))
     }
 
     private func buildSignedOut() {
@@ -93,15 +123,15 @@ final class MenuController: NSObject, NSMenuDelegate {
         } else {
             for (i, r) in model.recent.items.enumerated() {
                 let it = action("") { $0.model.copyRecent(i) }
-                it.attributedTitle = withTime(menuLine(r.text), menuTime(r.at))
                 it.toolTip = r.text
+                timed.append((it, menuLine(r.text), menuTime(r.at)))
                 add(it)
             }
         }
         menu.addItem(.separator())
         addLaunchAtLogin()
         menu.addItem(.separator())
-        if let me = model.me { add(info("\(me.name)（\(me.email)）")) }
+        if let me = model.me { add(info(me.email.isEmpty ? me.name : "\(me.name)（\(me.email)）")) }
         add(action("退出登录…") { $0.confirmSignOut() })
         menu.addItem(.separator())
         addTail()
@@ -115,7 +145,9 @@ final class MenuController: NSObject, NSMenuDelegate {
 
     private func addTail() {
         if let v = model.update { add(action("有新版本 \(v)…") { $0.model.openUpdate() }) }
-        let quit = NSMenuItem(title: "退出听·写", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        // No ⌘Q: a key equivalent reserves a column on the right of every
+        // item, which would keep the times of recent inserts off the edge.
+        let quit = NSMenuItem(title: "退出听·写", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         add(quit)
     }
 
@@ -142,10 +174,10 @@ final class MenuController: NSObject, NSMenuDelegate {
     }
 
     /// The text, then the time aligned right in the secondary colour.
-    private func withTime(_ text: String, _ time: String) -> NSAttributedString {
+    private func withTime(_ text: String, _ time: String, tab: CGFloat) -> NSAttributedString {
         let font = NSFont.menuFont(ofSize: 0)
         let style = NSMutableParagraphStyle()
-        style.tabStops = [NSTextTab(textAlignment: .right, location: 300)]
+        style.tabStops = [NSTextTab(textAlignment: .right, location: tab)]
         let s = NSMutableAttributedString(string: text + "\t", attributes: [.font: font, .paragraphStyle: style])
         s.append(NSAttributedString(string: time, attributes: [.font: font, .paragraphStyle: style, .foregroundColor: NSColor.secondaryLabelColor]))
         return s

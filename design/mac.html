@@ -262,7 +262,7 @@ const tick = `${ic('i-check', 'icon tick')}`;
 const logo = '<svg class="logo" viewBox="0 1 398 383"><use href="#logo"/></svg>';
 
 function menu(s) {
-  const tail = (s.update ? `<div class="it">有新版本 ${s.update}…</div>` : '') + `<div class="it">退出听·写<span class="k">⌘Q</span></div>`;
+  const tail = (s.update ? `<div class="it">有新版本 ${s.update}…</div>` : '') + `<div class="it">退出听·写</div>`;
   let h = '';
   if (s.loggedOut) {
     h += `<div class="it off">${s.msg || '未登录'}</div><div class="sep"></div>`;

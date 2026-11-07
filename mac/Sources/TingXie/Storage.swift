@@ -1,8 +1,6 @@
 import Foundation
-import Security
 
-/// What a signed-in Mac remembers. The token lives in the Keychain; the
-/// rest rides along so one item holds the whole session.
+/// What a signed-in Mac remembers.
 struct Session: Codable, Equatable {
     var server: URL
     var token: String
@@ -10,37 +8,44 @@ struct Session: Codable, Equatable {
     var deviceName: String
 }
 
-enum Keychain {
-    private static let service = "top.onlyquant.tingxie.mac"
-    private static let account = "session"
-
-    private static var query: [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: service,
-         kSecAttrAccount as String: account]
+/// The session lives in a file only this user can read, not in the
+/// Keychain: the login keychain ties an item to the exact build of an app
+/// without a Team ID (ours is self-signed), so every update would ask for
+/// the login password. The token can be revoked on the web.
+enum SessionStore {
+    private static var dir: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("top.onlyquant.tingxie.mac", isDirectory: true)
     }
 
+    private static var file: URL { dir.appendingPathComponent("session.json") }
+
     static func load() -> Session? {
-        var q = query
-        q[kSecReturnData as String] = true
-        q[kSecMatchLimit as String] = kSecMatchLimitOne
-        var out: AnyObject?
-        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let data = out as? Data else { return nil }
+        guard let data = try? Data(contentsOf: file) else { return nil }
         return try? JSONDecoder().decode(Session.self, from: data)
     }
 
+    /// Written to a 0600 temporary file and renamed, so the token is never
+    /// readable by others, not even for a moment.
     @discardableResult
     static func save(_ session: Session) -> Bool {
-        let data = try! JSONEncoder().encode(session)
-        SecItemDelete(query as CFDictionary)
-        var q = query
-        q[kSecValueData as String] = data
-        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        return SecItemAdd(q as CFDictionary, nil) == errSecSuccess
+        let fm = FileManager.default
+        do {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            let tmp = dir.appendingPathComponent(".session-\(UUID().uuidString)")
+            guard fm.createFile(atPath: tmp.path, contents: try JSONEncoder().encode(session), attributes: [.posixPermissions: 0o600]) else { return false }
+            guard rename(tmp.path, file.path) == 0 else {
+                try? fm.removeItem(at: tmp)
+                return false
+            }
+            return true
+        } catch {
+            return false
+        }
     }
 
     static func delete() {
-        SecItemDelete(query as CFDictionary)
+        try? FileManager.default.removeItem(at: file)
     }
 }
 
