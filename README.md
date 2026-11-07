@@ -94,4 +94,6 @@ task build           # 产物：release/asr
 
 同一个工作流还会构建安卓 APK，和 `latest.json` 一起附到 GitHub Release，安卓端据此更新。签名用的 secrets 是 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`；证书指纹写在工作流里，不符就中止发布。签名密钥一旦丢失，已安装的 app 就无法覆盖升级。
 
+随后在 macOS runner 上构建 Mac 客户端（通用二进制），用自签证书「TingXie Code Signing」签名，打成 `tingxie-mac-x.y.z.zip` 附到同一个 Release。secrets 是 `MAC_SIGN_P12_BASE64`、`MAC_SIGN_P12_PASSWORD`；证书指纹写在工作流里，不符就中止。辅助功能授权绑定这个证书，换证书后所有用户都要重新授权。证书不是苹果签发的，第一次打开要在「系统设置 → 隐私与安全性」里点「仍要打开」。
+
 容器内数据目录为 `/app/data`，配置文件需挂载到 `/app/config.yaml`。

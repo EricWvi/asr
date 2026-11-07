@@ -158,3 +158,71 @@ jobs:
             if [[ $VERSION == *-* ]]; then FLAGS+=(--prerelease); fi
             gh release create "$TAG" "tingxie-${VERSION}.apk" latest.json "${FLAGS[@]}"
           fi
+
+  # The Mac menu bar app, zipped onto the same release once the Android job
+  # has created it. Mac clients learn of a new version from latest.json and
+  # send the user to the release page.
+  mac:
+    needs: [image, android]
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.image.outputs.version }}
+      # The certificate the app is signed with. macOS ties the Accessibility
+      # permission to it, so an app signed by anything else would make every
+      # user grant it again: never publish one.
+      CERT_SHA256: fde59989901d061d9ef161b051565804a4bb1e6eb09754bf2d2fddc8f90651c9
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Test
+        working-directory: mac
+        run: swift test
+
+      - name: Import the signing certificate
+        env:
+          P12_BASE64: ${{ secrets.MAC_SIGN_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MAC_SIGN_P12_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          KC_PASSWORD=$(openssl rand -hex 16)
+          security create-keychain -p "$KC_PASSWORD" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$KC_PASSWORD" "$KC"
+          base64 --decode <<<"$P12_BASE64" > "$RUNNER_TEMP/signing.p12"
+          security import "$RUNNER_TEMP/signing.p12" -k "$KC" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/signing.p12"
+          # Lets codesign use the key without a prompt.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASSWORD" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+
+      - name: Build the signed app
+        env:
+          MAC_SIGN_IDENTITY: TingXie Code Signing
+          UNIVERSAL: "1"
+        run: ./mac/scripts/bundle.sh
+
+      - name: Check the signature
+        run: |
+          codesign -d --extract-certificates="$RUNNER_TEMP/cert" mac/build/TingXie.app
+          ACTUAL=$(shasum -a 256 "$RUNNER_TEMP/cert0" | cut -d' ' -f1)
+          echo "certificate SHA-256: $ACTUAL"
+          [[ $ACTUAL == "$CERT_SHA256" ]]
+          lipo -archs mac/build/TingXie.app/Contents/MacOS/TingXie
+          /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' mac/build/TingXie.app/Contents/Info.plist
+
+      - name: Publish to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ZIP="tingxie-mac-${VERSION}.zip"
+          # ditto keeps the signature and extended attributes intact.
+          ditto -c -k --keepParent mac/build/TingXie.app "$ZIP"
+          gh release upload "v${VERSION}" "$ZIP" --clobber
+
+      - name: Remove the signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
