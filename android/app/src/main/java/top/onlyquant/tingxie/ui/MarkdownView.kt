@@ -30,9 +30,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -46,6 +48,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.mikepenz.markdown.annotator.annotatorSettings
@@ -58,6 +61,7 @@ import com.mikepenz.markdown.compose.MarkdownElement
 import com.mikepenz.markdown.compose.components.MarkdownComponents
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownParagraph
+import com.mikepenz.markdown.compose.extendedspans.ExtendedSpans
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
@@ -66,9 +70,9 @@ import com.mikepenz.markdown.model.ImageTransformer
 import com.mikepenz.markdown.model.markdownAnnotator
 import com.mikepenz.markdown.model.markdownAnnotatorConfig
 import com.mikepenz.markdown.model.markdownExtendedSpans
-import com.mikepenz.markdown.compose.extendedspans.ExtendedSpans
 import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.model.rememberMarkdownState
+import kotlin.math.roundToInt
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.ASTNode
@@ -342,6 +346,10 @@ private fun MdList(content: String, node: ASTNode, ordered: Boolean, tint: Tint,
             orderedList = { MdList(it.content, it.node, ordered = true, tint, onToggle, depth + 1) },
         )
     }
+    // Dots and task boxes sit on the middle of the first line's characters:
+    // the text's first baseline, less [GLYPH_MID] of the font size. Fixed
+    // offsets drift with the font scale and the system font.
+    val glyphMid = with(LocalDensity.current) { (typo.paragraph.fontSize.takeIf { it.isSpecified } ?: bodySize).toPx() * GLYPH_MID }
     Column {
         var index = 0
         for (item in node.children) {
@@ -350,13 +358,14 @@ private fun MdList(content: String, node: ASTNode, ordered: Boolean, tint: Tint,
             val done = box != null && box.getTextInNode(content).contains(Regex("\\[[xX]]"))
             val number = start + index++
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                val onFirstLine = Modifier.alignBy { it.measuredHeight / 2 + glyphMid.roundToInt() }
                 when {
-                    box != null -> TaskBox(done) { onToggle(box.startOffset) }
+                    box != null -> TaskBox(done, onFirstLine) { onToggle(box.startOffset) }
                     ordered -> Text(
                         "$number.", style = typo.ordered, color = p.ink3,
-                        modifier = Modifier.width(24.dp),
+                        modifier = Modifier.width(24.dp).alignBy(FirstBaseline),
                     )
-                    else -> Box(Modifier.width(24.dp).height(with(androidx.compose.ui.platform.LocalDensity.current) { (bodySize.toPx() * 1.75f).toDp() }), contentAlignment = Alignment.CenterStart) {
+                    else -> Box(Modifier.width(24.dp).then(onFirstLine), contentAlignment = Alignment.CenterStart) {
                         Box(
                             Modifier
                                 .offset(x = 4.dp)
@@ -368,7 +377,7 @@ private fun MdList(content: String, node: ASTNode, ordered: Boolean, tint: Tint,
                         )
                     }
                 }
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).alignBy(FirstBaseline)) {
                     val doneTypo = if (done) remember(typo) { struck(typo, p.ink3) } else typo
                     val doneColors = if (done) remember(colors) { mutedColors(colors, p.ink3) } else colors
                     CompositionLocalProvider(LocalMarkdownTypography provides doneTypo, LocalMarkdownColors provides doneColors) {
@@ -404,18 +413,21 @@ private fun mutedColors(c: com.mikepenz.markdown.model.MarkdownColors, ink: Colo
     highlightText = c.highlightText, highlightBackground = c.highlightBackground,
 )
 
+/** How far above the baseline the middle of a CJK character is, in ems (ideographic em box: −0.12 to 0.88). */
+private const val GLYPH_MID = 0.38f
+
 /** A 20dp task box with a 40dp touch target. */
 @Composable
-private fun TaskBox(done: Boolean, onToggle: () -> Unit) {
+private fun TaskBox(done: Boolean, align: Modifier, onToggle: () -> Unit) {
     val p = Tokens.palette
     Box(
         Modifier
             .width(32.dp)
+            .then(align)
             .toggleable(done, remember { MutableInteractionSource() }, indication = null, role = Role.Checkbox) { onToggle() },
     ) {
         Box(
             Modifier
-                .padding(top = 5.dp)
                 .size(20.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(if (done) p.accent else Color.Transparent)
