@@ -119,7 +119,14 @@ svg { display: block; }
 .phone[data-screen="crop"] .statusbar, .phone[data-screen="home"] .statusbar { color: #fff; }
 .phone[data-screen="crop"] .gesture, .phone[data-screen="home"] .gesture { background: #fff; opacity: .6; }
 
-.screen { position: absolute; inset: 0; padding-top: 36px; display: flex; flex-direction: column; background: var(--bg); }
+.screen { position: absolute; inset: 0; z-index: 0; padding-top: 36px; display: flex; flex-direction: column; background: var(--bg); }
+/* 进入：新页面从右边滑进来，盖在当前页上面；返回：离开的页面整页向右滑出。下面那页都不动。滑动的页面带圆角，同手机屏幕 */
+.screen.leaving, .screen.entering { z-index: 1; pointer-events: none; overflow: hidden; border-radius: 32px; box-shadow: -10px 0 28px -6px rgb(0 0 0 / 0.18); }
+.screen.leaving { animation: slide-out .3s cubic-bezier(.2, 0, 0, 1) forwards; }
+.screen.entering { animation: slide-in .3s cubic-bezier(.2, 0, 0, 1) both; }
+.screen.leaving.frozen, .screen.entering.frozen { animation: none; transform: translateX(42%); }
+@keyframes slide-out { to { transform: translateX(100%); } }
+@keyframes slide-in { from { transform: translateX(100%); } }
 .scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain; }
 .scroll::-webkit-scrollbar { display: none; }
 /* 输入法弹起时，屏幕底部让出键盘的高度 */
@@ -989,11 +996,28 @@ if (matchMedia('(prefers-color-scheme: dark)').matches) root.dataset.theme = 'da
 // ---------- 屏幕与浮层 ----------
 const screens = ['login', 'tab', 'list', 'doc', 'send', 'profile', 'crop', 'devices', 'home'];
 const show = (name) => {
-  screens.forEach((s) => { $('s-' + s).hidden = s !== name; });
+  screens.forEach((s) => { $('s-' + s).hidden = s !== name; $('s-' + s).classList.remove('leaving', 'entering', 'frozen'); });
   phone.dataset.screen = name;
   closeAll();
 };
 const ime = (on) => phone.classList.toggle('ime', on);
+// 进入新页面：先切过去，原来的页面留在下面，新页面从右边滑进来
+const forward = (go, { frozen = false } = {}) => {
+  const from = document.querySelector('.screen:not([hidden])');
+  go();
+  const to = document.querySelector('.screen:not([hidden])');
+  if (!from || !from.hidden || !to) return;
+  from.hidden = false; to.classList.add('entering'); to.classList.toggle('frozen', frozen);
+  if (!frozen) to.addEventListener('animationend', () => { to.classList.remove('entering'); from.hidden = true; }, { once: true });
+};
+// 返回上一页：先切到上一页，再让刚离开的页面留在上层滑出去
+const back = (go, { frozen = false } = {}) => {
+  const from = document.querySelector('.screen:not([hidden])');
+  go();
+  if (!from || !from.hidden) return;
+  from.hidden = false; from.classList.add('leaving'); from.classList.toggle('frozen', frozen);
+  if (!frozen) from.addEventListener('animationend', () => { from.classList.remove('leaving'); from.hidden = true; }, { once: true });
+};
 const overlays = ['scrim', 'userMenu', 'docMenu', 'docSheet', 'targetSheet', 'renameDlg', 'serverDlg', 'logoutDlg', 'micDlg', 'palette'];
 const closeAll = () => {
   overlays.forEach((o) => { $(o).hidden = true; });
@@ -1058,7 +1082,7 @@ const docRow = (d, html) => {
   let timer, long = false;
   el.onpointerdown = () => { long = false; timer = setTimeout(() => { long = true; openDocSheet(d, el); }, 500); };
   el.onpointerup = el.onpointerleave = el.onpointercancel = () => clearTimeout(timer);
-  el.onclick = () => { if (!long) openDoc(d, words); };
+  el.onclick = () => { if (!long) forward(() => openDoc(d, words)); };
   el.oncontextmenu = (e) => e.preventDefault();
   return el;
 };
@@ -1089,7 +1113,7 @@ const renderList = () => {
   }
 };
 const openList = () => { show('list'); ime(false); renderList(); };
-$('fab').onclick = $('fabWide').onclick = () => newDoc();
+$('fab').onclick = $('fabWide').onclick = () => forward(newDoc);
 
 // 搜索：按输入法的「搜索」才搜，删光或点 × 回到列表
 const q = $('q');
@@ -1125,12 +1149,12 @@ $('sheetDelete').onclick = () => deleteDoc(sheetDoc);
 
 // 头像菜单
 $('meBtn').onclick = () => { open('userMenu', { clear: true }); $('meBtn').classList.add('open'); };
-$('sendItem').onclick = () => openSend();
-$('profileItem').onclick = () => openProfile();
-$('devicesItem').onclick = () => openDevices();
+$('sendItem').onclick = () => forward(openSend);
+$('profileItem').onclick = () => forward(openProfile);
+$('devicesItem').onclick = () => forward(openDevices);
 $('logoutItem').onclick = () => { closeAll(); open('logoutDlg'); };
 $('logoutOk').onclick = () => { show('login'); ime(false); loginMsg(''); };
-document.querySelectorAll('[data-back]').forEach((b) => b.onclick = () => openList());
+document.querySelectorAll('[data-back]').forEach((b) => b.onclick = () => back(openList));
 
 // ---------- 文稿 ----------
 const doc = $('s-doc'), docScroll = $('docScroll');
@@ -1158,7 +1182,7 @@ const newDoc = () => {
   bindView(); syncTidy();
 };
 docScroll.addEventListener('scroll', () => { doc.classList.toggle('scrolled', docScroll.scrollTop > 60); });
-$('docBack').onclick = () => { commitTitle(); openList(); };
+$('docBack').onclick = () => back(() => { commitTitle(); openList(); });
 $('docMore').onclick = () => open('docMenu', { clear: true });
 $('copyItem').onclick = () => { closeAll(); snack('已复制 Markdown'); };
 $('docDelete').onclick = () => deleteDoc(current);
@@ -1353,7 +1377,7 @@ const renderSends = () => {
   requestAnimationFrame(() => { $('sendScroll').scrollTop = 0; });
 };
 const openSend = () => { show('send'); renderTarget(); renderSends(); };
-$('sendBack').onclick = () => openList();
+$('sendBack').onclick = () => back(openList);
 const renderPicks = () => {
   $('targetPicks').innerHTML = MACS.map((m) => `<button class="pick${m.id !== 'auto' && !m.online ? ' dim' : ''}" data-id="${m.id}">
     <span class="dev-icon"><svg class="icon"><use href="#i-${m.id === 'auto' ? 'send' : 'laptop'}"/></svg></span>
@@ -1504,6 +1528,9 @@ const STATES = {
   'tidy-error': () => { openDoc(); docScroll.scrollTop = docScroll.scrollHeight; snack('整理失败，请稍后再试'); },
 
   list: () => openList(),
+  'enter-doc': () => { openList(); forward(() => openDoc(), { frozen: true }); },
+  'back-doc': () => { openDoc(); back(openList, { frozen: true }); },
+  'back-send': () => { openSend(); back(openList, { frozen: true }); },
   'list-blur': () => { phone.classList.add('blur'); openList(); },
   'list-fab-wide': () => { openList(); $('fab').hidden = true; $('fabWide').hidden = false; $('s-list').querySelector('.list-fade').hidden = true; },
   'list-sky': () => { filter = 'sky'; openList(); },
@@ -1551,6 +1578,7 @@ const GROUPS = [
   ['语音', [['录音中', 'rec'], ['最后 30 秒', 'countdown'], ['上滑取消', 'rec-cancel'], ['编辑时录音', 'rec-edit'], ['刚写入', 'rec-done'], ['识别中断', 'asr-error'], ['落选：卡片式提示', 'asr-error-card'], ['请求麦克风权限', 'mic-ask'], ['没有麦克风权限', 'mic-denied']]],
   ['整理', [['整理中', 'tidying'], ['整理完成', 'tidied'], ['没有待整理', 'tidy-empty'], ['整理失败', 'tidy-error']]],
   ['列表', [['文稿列表（启动）', ''], ['落选：毛玻璃', 'list-blur'], ['落选：扩展新建按钮', 'list-fab-wide'], ['只看天空色', 'list-sky'], ['筛选为空', 'list-filter-empty'], ['长按菜单', 'list-sheet'], ['重命名', 'rename'], ['删除后撤销', 'deleted'], ['没有文稿', 'list-empty']]],
+  ['页面切换', [['打开文稿（动画中途）', 'enter-doc'], ['文稿返回列表（动画中途）', 'back-doc'], ['发送到电脑返回列表（动画中途）', 'back-send']]],
   ['置顶', [['置顶长按菜单', 'list-sheet-pinned'], ['只看桃色', 'list-peach'], ['落选：行内图钉', 'list-pin-icon']]],
   ['搜索', [['输入中', 'search-input'], ['搜索结果', 'search'], ['没有结果', 'search-empty'], ['正文命中', 'search-hit']]],
   ['发送到电脑', [['头像菜单', 'user-menu'], ['发送到电脑', 'send'], ['切换电脑', 'send-targets'], ['录音中', 'send-rec'], ['上滑取消', 'send-cancel'], ['发送中', 'send-sending'], ['已发送', 'send-done'], ['没有在线的电脑', 'send-offline'], ['电脑没有响应', 'send-timeout'], ['没有记录', 'send-empty'], ['离线', 'send-net-off']]],
