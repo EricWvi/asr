@@ -17,7 +17,8 @@ def page(body, w, h):
 <svg width="0" height="0" style="position:absolute"><defs>{MASK}</defs>{LOGO}{TRAY}</svg>
 <div id="c" style="width:{w}px;height:{h}px">{body}</div></body></html>'''
 
-# macOS app icon: 1024 canvas, 824 rounded square (Apple's grid), paper colour, logo ~56% of the square.
+# macOS app icon: 1024 canvas, 824 rounded square (Apple's grid), paper colour. The logo is 75% of the
+# square's width, as on Android (54dp in the 72dp the launcher shows), and centred.
 def app_icon(size):
     s = size / 1024
     return page(f'''<svg width="{size}" height="{size}" viewBox="0 0 1024 1024">
@@ -25,7 +26,7 @@ def app_icon(size):
 <filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity=".22"/></filter></defs>
 <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#g)" filter="url(#sh)"/>
 <rect x="100.5" y="100.5" width="823" height="823" rx="185" fill="none" stroke="#000" stroke-opacity=".06"/>
-<svg x="282" y="295" width="460" height="434" viewBox="0 1 398 383"><use href="#logo"/></svg></svg>''', size, size)
+<svg x="203" y="215" width="618" height="594" viewBox="0 1 398 383"><use href="#logo"/></svg></svg>''', size, size)
 
 async def main():
     async with async_playwright() as p:
