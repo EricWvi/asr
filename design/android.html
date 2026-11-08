@@ -425,7 +425,6 @@ svg { display: block; }
 }
 .cancel-hint .icon { width: 16px; height: 16px; }
 .phone.ime .cancel-hint { bottom: calc(var(--kb-h) + 66px); }
-.phone[data-screen="send"] .cancel-hint { bottom: 126px; }
 .phone.cancelling .cancel-hint { visibility: hidden; }
 
 /* 键盘弹起时：说话按钮缩进键盘上方的工具栏 */
@@ -466,7 +465,7 @@ svg { display: block; }
 .sends { padding: 12px 16px 160px; display: flex; flex-direction: column; gap: 10px; }
 .sends .label { padding: 6px 4px 0; font-size: 13px; color: var(--ink-3); }
 .sent { padding: 12px 6px 6px 14px; border-radius: 16px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
-.sent-text { padding-right: 8px; font-size: 16px; line-height: 1.6; user-select: text; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.sent-text { padding-right: 8px; font-size: 16px; line-height: 1.6; user-select: text; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .sent-foot { display: flex; align-items: center; gap: 2px; margin-top: 2px; min-height: 40px; }
 .sent-meta { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; }
 .sent-meta span { overflow: hidden; text-overflow: ellipsis; }
@@ -477,8 +476,32 @@ svg { display: block; }
 .sent.live .sent-text { color: var(--ink-3); }
 .sent.live { box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--rec) 45%, var(--line)); }
 .sent .fresh { text-decoration-color: var(--accent); }
-.send-foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; padding: 28px 16px 52px; background: linear-gradient(transparent, var(--bg) 28px); }
-.send-foot .hold { width: 100%; height: 60px; font-size: 16.5px; }
+/* 底部悬浮条同文稿页：粘贴 ｜ 按住说话 ｜ 键盘 */
+/* 打字：键盘上方是输入框和发送按钮，左边的麦克风切回说话。输入框最多 6 行，再多在框里滚动 */
+#s-send.typing .sends { padding-bottom: 16px; }
+.compose { flex: none; background: var(--surface); box-shadow: 0 -1px 0 var(--line); }
+.compose-row { display: flex; align-items: flex-end; gap: 4px; padding: 8px 8px 8px 2px; }
+.compose .icon-btn { width: 44px; height: 44px; flex: none; }
+.cfield { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 4px; min-height: 44px; padding: 0 6px 0 16px; border-radius: 22px; background: var(--chip); }
+.cfield textarea {
+  flex: 1; min-width: 0; height: 44px; max-height: 164px; padding: 10px 0; border: 0; outline: none; resize: none; background: none;
+  font-family: inherit; font-size: 16px; line-height: 24px; color: var(--ink); caret-color: var(--accent); user-select: text;
+  overflow-wrap: anywhere; scrollbar-width: none;
+}
+.cfield textarea::placeholder { color: var(--ink-3); }
+.paste { flex: none; height: 32px; margin: 6px 0; padding: 0 12px 0 9px; border-radius: 16px; display: inline-flex; align-items: center; gap: 5px; font-size: 14px; color: var(--ink-2); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.paste .icon { width: 16px; height: 16px; }
+.paste:active { background: var(--selected); }
+.csend { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; transition: background .15s, color .15s; }
+.csend:disabled { background: var(--chip); color: var(--ink-3); cursor: default; }
+.climit { padding: 8px 16px 0 54px; font-size: 13px; color: var(--rec); }
+.phone[data-screen="send"].ime .snack { bottom: calc(var(--kb-h) + 76px); }
+/* 落选变体：顶栏按钮打开底部弹层，弹层贴在键盘上方（#send-type-sheet） */
+.phone.ime .bsheet.typesheet { bottom: var(--kb-h); padding-bottom: 12px; }
+.typesheet .cfield { margin: 0 12px; padding: 4px 16px; border-radius: 16px; }
+.typesheet .cfield textarea { height: 152px; max-height: none; }
+.typesheet .acts { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 12px 0; }
+.typesheet .acts .go { background: var(--accent); color: #fff; }
 
 /* ---------- 个人资料、设备 ---------- */
 .profile { display: flex; flex-direction: column; align-items: center; padding: 28px 24px; }
@@ -588,7 +611,7 @@ svg { display: block; }
 .phone[data-screen="doc"] .snack { bottom: 134px; }
 .phone[data-screen="list"] .snack { bottom: 134px; }
 .phone[data-screen="doc"].ime .snack { bottom: calc(var(--kb-h) + 66px); }
-.phone[data-screen="send"] .snack { bottom: 138px; }
+.phone[data-screen="send"] .snack { bottom: 134px; }
 
 /* 系统权限对话框（Android 14 样式） */
 .sysdlg { width: 100%; padding: 26px 22px 20px; border-radius: 28px; background: var(--sys); color: var(--sys-ink); text-align: center; }
@@ -669,6 +692,8 @@ svg { display: block; }
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16" rx="2"/><path d="M9 4.5h6v3H9z"/></symbol>
   <symbol id="i-chev-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
   <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
   <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></symbol>
@@ -866,6 +891,7 @@ svg { display: block; }
     <div class="appbar">
       <button class="back" id="sendBack"><svg class="icon"><use href="#i-back"/></svg></button>
       <h1>发送到电脑</h1>
+      <button class="icon-btn" id="typeTop" title="打字" hidden><svg class="icon"><use href="#i-keyboard"/></svg></button>
     </div>
     <div class="offline-bar" id="sendOffline" hidden><svg class="icon sm"><use href="#i-cloud-off"/></svg>离线，只能查看</div>
     <button class="target" id="target">
@@ -874,9 +900,21 @@ svg { display: block; }
       <svg class="icon chev"><use href="#i-chev-down"/></svg>
     </button>
     <div class="scroll" id="sendScroll"><div class="sends" id="sends"></div></div>
-    <div class="send-foot">
+    <div class="dock" id="sendDock">
+      <button class="dock-side" id="pasteSide"><svg class="icon sm"><use href="#i-clipboard"/></svg>粘贴</button>
       <button class="hold" id="hold3"><svg class="icon mic"><use href="#i-mic"/></svg><svg class="icon x-ic"><use href="#i-x"/></svg><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="hold-text">按住说话</span><span class="left" hidden>0:28</span></button>
+      <button class="dock-side" id="typeBtn"><svg class="icon sm"><use href="#i-keyboard"/></svg>键盘</button>
     </div>
+    <!-- 打字：直接输入或粘贴文字发送，不经过识别 -->
+    <div class="compose" id="compose" hidden>
+      <div class="climit" id="climit" hidden></div>
+      <div class="compose-row">
+        <button class="icon-btn" id="toVoice" title="说话"><svg class="icon"><use href="#i-mic"/></svg></button>
+        <div class="cfield"><textarea id="ctext" rows="1" placeholder="输入或粘贴文字"></textarea><button class="paste" id="pasteBtn"><svg class="icon"><use href="#i-clipboard"/></svg>粘贴</button></div>
+        <button class="csend" id="csend" title="发送" disabled><svg class="icon"><use href="#i-arrow-up"/></svg></button>
+      </div>
+    </div>
+    <div class="kb-space"></div>
   </section>
 
   <!-- 个人资料 -->
@@ -956,6 +994,12 @@ svg { display: block; }
     <div class="bsheet-head">发送到</div>
     <div id="targetPicks"></div>
   </div>
+  <!-- 落选变体：顶栏「键盘」打开的发送文字弹层 -->
+  <div class="bsheet typesheet" id="typeSheet" hidden>
+    <div class="bsheet-head">发送文字</div>
+    <div class="cfield"><textarea id="stext" placeholder="输入或粘贴文字"></textarea></div>
+    <div class="acts"><button class="btn" id="spaste"><svg class="icon sm"><use href="#i-clipboard"/></svg>粘贴</button><button class="btn go" id="ssend">发送</button></div>
+  </div>
   <div class="dlg-wrap" id="renameDlg" hidden>
     <div class="dlg"><h3>重命名</h3><div class="field"><input id="renameInput" value="2026/10/24 09:15"></div>
       <div class="acts"><button class="btn ghost" data-close>取消</button><button class="btn primary" data-close>保存</button></div></div>
@@ -1018,7 +1062,7 @@ const back = (go, { frozen = false } = {}) => {
   from.hidden = false; from.classList.add('leaving'); from.classList.toggle('frozen', frozen);
   if (!frozen) from.addEventListener('animationend', () => { from.classList.remove('leaving'); from.hidden = true; }, { once: true });
 };
-const overlays = ['scrim', 'userMenu', 'docMenu', 'docSheet', 'targetSheet', 'renameDlg', 'serverDlg', 'logoutDlg', 'micDlg', 'palette'];
+const overlays = ['scrim', 'userMenu', 'docMenu', 'docSheet', 'targetSheet', 'typeSheet', 'renameDlg', 'serverDlg', 'logoutDlg', 'micDlg', 'palette'];
 const closeAll = () => {
   overlays.forEach((o) => { $(o).hidden = true; });
   $('scrim').classList.remove('clear');
@@ -1376,7 +1420,7 @@ const renderSends = () => {
   box.querySelectorAll('[data-resend]').forEach((b, i) => b.onclick = () => { const s = shown[i]; if (s.err) sends.splice(sends.indexOf(s), 1); sends.push({ t: s.t, to: 'Eric 的 MacBook Pro', at: '14:32', fresh: true }); renderSends(); });
   requestAnimationFrame(() => { $('sendScroll').scrollTop = 0; });
 };
-const openSend = () => { show('send'); renderTarget(); renderSends(); };
+const openSend = () => { show('send'); setTyping(false); renderTarget(); renderSends(); };
 $('sendBack').onclick = () => back(openList);
 const renderPicks = () => {
   $('targetPicks').innerHTML = MACS.map((m) => `<button class="pick${m.id !== 'auto' && !m.online ? ' dim' : ''}" data-id="${m.id}">
@@ -1398,7 +1442,11 @@ bindHold($('hold3'), (btn) => {
   setRec(btn, false); clearInterval(interimTimer);
   if (!live.t) { sends.pop(); renderSends(); return; }
   const s = live; live = null;
-  Object.assign(s, { live: false, sending: true, to: 'Eric 的 MacBook Pro' }); renderSends();
+  s.live = false; deliver(s);
+}, (btn) => { setRec(btn, false); clearInterval(interimTimer); sends.pop(); live = null; renderSends(); });
+// 说话和打字共用：记录先显示「正在发送」，结果回来后改成已发送或失败原因
+const deliver = (s) => {
+  Object.assign(s, { sending: true, to: 'Eric 的 MacBook Pro' }); renderSends();
   setTimeout(() => {
     s.sending = false;
     const m = MACS.find((x) => x.id === target);
@@ -1406,7 +1454,56 @@ bindHold($('hold3'), (btn) => {
     else { s.at = '14:32'; s.fresh = true; }
     renderSends();
   }, 700);
-}, (btn) => { setRec(btn, false); clearInterval(interimTimer); sends.pop(); live = null; renderSends(); });
+};
+
+// 打字：点「键盘」换成输入框，键盘弹起；麦克风或返回键收起键盘回到说话。
+// 输入框是多行的，回车换行，只有发送按钮发送。发出后输入框清空、键盘不收，可以接着发下一条
+const LIMIT = 20000;
+const clip = 'https://github.com/EricWvi/asr/releases/tag/v0.8.0';
+const clipLong = `周六的安排：
+1. 早上九点在南门集合，自己带水
+2. 先去湿地公园走一圈，大概两小时
+3. 中午在附近找家面馆，人多的话提前订位
+4. 下午回城，想看展的可以去美术馆，新开了一个摄影展
+5. 晚饭各自解决
+
+有问题在群里说，周五晚上之前确认人数。`;
+const ctext = $('ctext');
+const fitText = () => { ctext.style.height = 'auto'; ctext.style.height = Math.min(ctext.scrollHeight, 164) + 'px'; };
+const syncCompose = () => {
+  fitText();
+  const n = [...ctext.value].length, over = n > LIMIT, empty = !ctext.value.trim();
+  $('pasteBtn').hidden = !!ctext.value;
+  $('csend').disabled = empty || over;
+  $('climit').hidden = !over;
+  $('climit').textContent = `最多 ${LIMIT.toLocaleString()} 字，现在 ${n.toLocaleString()} 字`;
+};
+const setTyping = (on) => {
+  $('s-send').classList.toggle('typing', on);
+  $('sendDock').hidden = on; $('compose').hidden = !on;
+  ime(on);
+  if (on) { syncCompose(); ctext.focus(); } else ctext.blur();
+};
+ctext.oninput = syncCompose;
+$('typeBtn').onclick = () => setTyping(true);
+$('toVoice').onclick = () => setTyping(false);
+// 粘贴按钮只在输入框为空时出现；点了才读剪贴板（安卓 12 起系统会提示「已粘贴」）
+const paste = (text) => { ctext.value = text; syncCompose(); ctext.focus(); ctext.setSelectionRange(text.length, text.length); ctext.scrollTop = ctext.scrollHeight; };
+$('pasteBtn').onclick = () => paste(clip);
+// 悬浮条左边的「粘贴」：进打字模式并填入剪贴板，看一眼再发
+$('pasteSide').onclick = () => { setTyping(true); paste(clip); };
+// 开头的空行和末尾的空白去掉，行首缩进保留
+const sendTyped = () => {
+  const t = ctext.value.replace(/^(\s*\n)+/, '').trimEnd();
+  if (!t.trim() || [...t].length > LIMIT) return;
+  ctext.value = ''; syncCompose();
+  const s = { t }; sends.push(s); deliver(s);
+};
+$('csend').onclick = sendTyped;
+// 落选变体的弹层
+$('typeTop').onclick = () => { if (root.dataset.top) { setTyping(true); return; } open('typeSheet'); ime(true); $('stext').focus(); };
+$('spaste').onclick = () => { $('stext').value = clip; };
+$('ssend').onclick = () => { const t = $('stext').value.trim(); if (!t) return; closeAll(); ime(false); $('stext').value = ''; const s = { t }; sends.push(s); deliver(s); };
 
 // ---------- 个人资料与头像 ----------
 const samplePhoto = 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600">
@@ -1557,7 +1654,17 @@ const STATES = {
   'send-offline': () => { openSend(); renderTarget(true); sends.push({ t: spoken, err: '没有在线的电脑，文字已保留' }); renderSends(); },
   'send-timeout': () => { openSend(); sends.push({ t: spoken, err: '电脑没有响应' }); renderSends(); },
   'send-empty': () => { sends = []; openSend(); },
-  'send-net-off': () => { openSend(); $('sendOffline').hidden = false; $('hold3').parentElement.hidden = true; },
+  'send-net-off': () => { openSend(); $('sendOffline').hidden = false; $('sendDock').hidden = true; },
+  'send-type': () => { openSend(); setTyping(true); },
+  'send-type-paste': () => { openSend(); setTyping(true); paste(clip); },
+  'send-type-long': () => { openSend(); setTyping(true); paste(clipLong); },
+  'send-type-sending': () => { openSend(); setTyping(true); paste(clip); sends.push({ t: clip, sending: true, to: 'Eric 的 MacBook Pro' }); ctext.value = ''; syncCompose(); renderSends(); },
+  'send-type-done': () => { openSend(); setTyping(true); sends.push({ t: clip, to: 'Eric 的 MacBook Pro', at: '14:32', fresh: true }); renderSends(); },
+  'send-type-failed': () => { openSend(); renderTarget(true); setTyping(true); sends.push({ t: clip, err: '没有在线的电脑，文字已保留' }); renderSends(); },
+  'send-type-over': () => { openSend(); setTyping(true); paste(clipLong.repeat(Math.ceil(20400 / [...clipLong].length))); },
+  'send-type-top': () => { root.dataset.top = '1'; openSend(); $('pasteSide').hidden = $('typeBtn').hidden = true; $('typeTop').hidden = false; },
+  'send-type-top-open': () => { root.dataset.top = '1'; openSend(); $('pasteSide').hidden = $('typeBtn').hidden = true; $('typeTop').hidden = false; $('typeTop').click(); },
+  'send-type-sheet': () => { openSend(); $('pasteSide').hidden = $('typeBtn').hidden = true; $('typeTop').hidden = false; $('typeTop').click(); $('stext').value = clipLong; },
   profile: () => openProfile(),
   'profile-avatar': () => { avatar = samplePhoto; openProfile(); },
   'update-snack': () => { openList(); snack('有新版本 0.6.0', '更新', () => {}); },
@@ -1582,6 +1689,7 @@ const GROUPS = [
   ['置顶', [['置顶长按菜单', 'list-sheet-pinned'], ['只看桃色', 'list-peach'], ['落选：行内图钉', 'list-pin-icon']]],
   ['搜索', [['输入中', 'search-input'], ['搜索结果', 'search'], ['没有结果', 'search-empty'], ['正文命中', 'search-hit']]],
   ['发送到电脑', [['头像菜单', 'user-menu'], ['发送到电脑', 'send'], ['切换电脑', 'send-targets'], ['录音中', 'send-rec'], ['上滑取消', 'send-cancel'], ['发送中', 'send-sending'], ['已发送', 'send-done'], ['没有在线的电脑', 'send-offline'], ['电脑没有响应', 'send-timeout'], ['没有记录', 'send-empty'], ['离线', 'send-net-off']]],
+  ['发送文字', [['打字', 'send-type'], ['粘贴后', 'send-type-paste'], ['粘贴长文字（6 行后滚动）', 'send-type-long'], ['发送中', 'send-type-sending'], ['已发送', 'send-type-done'], ['没有在线的电脑', 'send-type-failed'], ['超过 20000 字', 'send-type-over'], ['落选：顶栏键盘', 'send-type-top'], ['落选：顶栏键盘（打字）', 'send-type-top-open'], ['落选：顶栏按钮 + 弹层', 'send-type-sheet']]],
   ['我的', [['个人资料', 'profile'], ['已有头像', 'profile-avatar'], ['裁剪头像', 'avatar-crop'], ['保存中', 'avatar-saving'], ['保存失败', 'avatar-error'], ['设备', 'devices'], ['退出登录', 'logout']]],
   ['更新', [['发现新版本（提示条）', 'update-snack'], ['下载中（提示条）', 'update-snack-down'], ['下载失败（提示条）', 'update-snack-fail'], ['未检查', 'update-idle'], ['检查中', 'update-checking'], ['已是最新', 'update-latest'], ['有新版本', 'update-available'], ['下载中', 'update-downloading'], ['已下载', 'update-ready'], ['检查失败', 'update-check-failed'], ['下载失败', 'update-download-failed'], ['校验失败', 'update-bad-file']]],
 ];
