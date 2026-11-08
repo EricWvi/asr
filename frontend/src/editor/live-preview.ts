@@ -189,6 +189,8 @@ function build(state: EditorState): DecorationSet {
   const codeLines = new Set<number>();
   /** Lines that already got a list line decoration. */
   const listLines = new Set<number>();
+  /** The > marks on cursor lines, by line number: [from, to). */
+  const quotePrefixes = new Map<number, [number, number]>();
   const isActive = (pos: number) => active.has(doc.lineAt(pos).number);
 
   const anyActive = (first: number, last: number) => {
@@ -245,7 +247,11 @@ function build(state: EditorState): DecorationSet {
         case "QuoteMark": {
           const l = doc.lineAt(ref.from);
           const end = l.text[ref.to - l.from] == " " ? ref.to + 1 : ref.to;
-          hideMark(ref.from, end);
+          if (!active.has(l.number)) out.push(hide.range(ref.from, end));
+          else {
+            const prev = quotePrefixes.get(l.number);
+            quotePrefixes.set(l.number, [prev ? prev[0] : ref.from, end]);
+          }
           return;
         }
         case "ListItem": {
@@ -416,9 +422,12 @@ function build(state: EditorState): DecorationSet {
       const l = doc.line(n);
       if (n != first && !l.text.trim()) continue;
       out.push(line(`cm-md-list ${kind}`, `--depth:${depth}`).range(l.from));
-      // Indentation is drawn by the line padding, so the source spaces are hidden.
-      const indent = /^\s*/.exec(l.text)![0].length;
-      if (indent) out.push(hide.range(l.from, l.from + indent));
+      // Indentation is drawn by the line padding, so the source spaces are
+      // hidden. In a quote they follow the > marks, and on the cursor's line
+      // they hang with them instead (see below).
+      const quote = /^(?:\s*>\s?)*/.exec(l.text)![0].length;
+      const indent = /^\s*/.exec(l.text.slice(quote))![0].length;
+      if (indent && !(quote && active.has(n))) out.push(hide.range(l.from + quote, l.from + quote + indent));
     }
     if (!mark) return;
     const l = doc.lineAt(mark.from);
@@ -434,6 +443,18 @@ function build(state: EditorState): DecorationSet {
       const dim = active.has(l.number) ? "" : " cm-md-lm-dim";
       out.push(Decoration.mark({ class: `cm-md-lm${dim}` }).range(mark.from, mark.to + space));
     }
+  }
+
+  // On a list line inside a quote, the > marks hang in the quote's padding,
+  // ahead of the list marker as in the source. Left in the text they would
+  // sit after the out-of-flow marker, and End would stop in front of it.
+  // A nested item's indent hangs with them for the same reason; a hidden
+  // range would stay in the text, since the mark does not wrap it.
+  for (const [n, [from, to]] of quotePrefixes) {
+    if (!listLines.has(n)) continue;
+    const l = doc.line(n);
+    const end = to + /^\s*/.exec(l.text.slice(to - l.from))![0].length;
+    out.push(Decoration.mark({ class: "cm-md-quote-hang" }).range(from, end));
   }
 
   // Blank lines between blocks shrink to paragraph spacing, except the

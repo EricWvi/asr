@@ -252,19 +252,45 @@
   right: calc(100% + 0.18em);
 }
 
+/* Quotes: consecutive quote lines form one rounded block. Lists inside
+ * indent from --inset, so their rules below must come after this one. */
+.cm-editor .cm-line.cm-md-quote {
+  --inset: 16px;
+  padding: 0 var(--inset);
+  background: var(--paper-soft);
+  color: var(--ink-2);
+}
+.cm-editor .cm-line.cm-md-quote-first {
+  padding-top: 10px;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+.cm-editor .cm-line.cm-md-quote-last {
+  padding-bottom: 10px;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+/* On the cursor's line of a list inside a quote, > hangs in the quote's padding, ahead of the list marker. */
+.cm-md-quote-hang {
+  position: absolute;
+  /* Centres > (about 0.6em wide); editable text keeps its spaces, so text-align cannot. */
+  left: calc((var(--inset) - 0.6em) / 2);
+  white-space: pre;
+}
+
 /* Lists: the marker hangs in the indent, wrapped text lines up with the first line. */
 .cm-editor .cm-line.cm-md-list {
   position: relative;
-  padding-left: calc((var(--depth) + 1) * 1.4em);
+  padding-left: calc(var(--inset, 0px) + (var(--depth) + 1) * 1.4em);
   /* An empty item holds only its out-of-flow marker, which gives the line no height. */
   min-height: 1lh;
 }
 .cm-editor .cm-line.cm-md-task {
-  padding-left: calc(var(--depth) * 1.4em + 27px);
+  padding-left: calc(var(--inset, 0px) + var(--depth) * 1.4em + 27px);
 }
 .cm-md-lm {
   position: absolute;
-  left: calc(var(--depth) * 1.4em);
+  left: calc(var(--inset, 0px) + var(--depth) * 1.4em);
 }
 /* Syntax marks take the document's deep tint, also inside links. */
 .cm-md-pi {
@@ -279,7 +305,7 @@
 /* Drawn rather than typed, so the size does not depend on the font's • ◦ ▪. */
 .cm-md-bullet {
   top: 0;
-  left: calc(var(--depth) * 1.4em);
+  left: calc(var(--inset, 0px) + var(--depth) * 1.4em);
   width: 1em;
   height: 1.85em;
   display: grid;
@@ -304,7 +330,7 @@
 }
 .cm-md-box {
   position: absolute;
-  left: calc(var(--depth) * 1.4em);
+  left: calc(var(--inset, 0px) + var(--depth) * 1.4em);
   top: 6px;
   width: 17px;
   height: 17px;
@@ -328,22 +354,6 @@
   text-decoration: line-through;
 }
 
-/* Quotes: consecutive quote lines form one rounded block. */
-.cm-editor .cm-line.cm-md-quote {
-  padding: 0 16px;
-  background: var(--paper-soft);
-  color: var(--ink-2);
-}
-.cm-editor .cm-line.cm-md-quote-first {
-  padding-top: 10px;
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
-}
-.cm-editor .cm-line.cm-md-quote-last {
-  padding-bottom: 10px;
-  border-bottom-left-radius: 12px;
-  border-bottom-right-radius: 12px;
-}
 
 /* Code blocks: away from the cursor the opening fence becomes a header with the language and a copy button, and the closing fence shrinks to padding. */
 .cm-editor .cm-line.cm-md-code {
