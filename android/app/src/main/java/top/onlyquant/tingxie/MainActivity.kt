@@ -3,7 +3,6 @@ package top.onlyquant.tingxie
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -22,6 +21,7 @@ import top.onlyquant.tingxie.ui.DevicesScreen
 import top.onlyquant.tingxie.ui.DocScreen
 import top.onlyquant.tingxie.ui.ListScreen
 import top.onlyquant.tingxie.ui.LoginScreen
+import top.onlyquant.tingxie.ui.Pages
 import top.onlyquant.tingxie.ui.ProfileScreen
 import top.onlyquant.tingxie.ui.SearchState
 import top.onlyquant.tingxie.ui.SendScreen
@@ -76,13 +76,14 @@ fun App(m: AppModel) {
             }
             val search = remember(m.api) { SearchState() }
             val saved = rememberSaveableStateHolder()
-            BackHandler(m.stack.size > 1) { m.back() }
-            when (val top = m.stack.lastOrNull()) {
-                Route.List, null -> saved.SaveableStateProvider("list") { ListScreen(m, search) }
-                is Route.Doc -> saved.SaveableStateProvider("doc-${top.id}") { DocScreen(m, top) }
-                Route.Profile -> ProfileScreen(m)
-                Route.Devices -> DevicesScreen(m)
-                Route.Send -> SendScreen(m)
+            Pages(m.stack, onBack = { m.back() }) { route ->
+                when (route) {
+                    Route.List -> saved.SaveableStateProvider("list") { ListScreen(m, search) }
+                    is Route.Doc -> saved.SaveableStateProvider("doc-${route.id}") { DocScreen(m, route) }
+                    Route.Profile -> ProfileScreen(m)
+                    Route.Devices -> DevicesScreen(m)
+                    Route.Send -> SendScreen(m)
+                }
             }
         }
     }
