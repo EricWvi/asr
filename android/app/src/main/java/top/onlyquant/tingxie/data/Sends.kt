@@ -49,6 +49,14 @@ fun sendFailure(e: Throwable): String = when {
     else -> e.userMessage()
 }
 
+/** The server's cap on one send, in code points, as it counts them. */
+const val MaxSendChars = 20000
+
+/** Typed text as it is sent: blank lines at the start and whitespace at the end go; indentation stays. */
+fun typedText(raw: String): String = raw.replace(LeadingBlankLines, "").trimEnd()
+
+private val LeadingBlankLines = Regex("^(\\s*\n)+")
+
 /** Who 自动 will reach, as push.Hub picks: the online Mac used most recently. */
 fun autoTarget(macs: List<Device>?): Device? = macs?.filter { it.online }?.maxByOrNull { it.lastActiveAt }
 

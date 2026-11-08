@@ -1,6 +1,7 @@
 package top.onlyquant.tingxie.ui
 
 import android.content.ClipData
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -17,12 +18,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,27 +47,39 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.dropWhile
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import top.onlyquant.tingxie.AppModel
 import top.onlyquant.tingxie.data.Device
+import top.onlyquant.tingxie.data.MaxSendChars
 import top.onlyquant.tingxie.data.SendRecord
 import top.onlyquant.tingxie.data.SendState
 import top.onlyquant.tingxie.data.activeAgo
 import top.onlyquant.tingxie.data.autoTarget
 import top.onlyquant.tingxie.data.sentTime
+import top.onlyquant.tingxie.data.typedText
 import top.onlyquant.tingxie.data.usedAgo
 import top.onlyquant.tingxie.ui.theme.Tokens
 import top.onlyquant.tingxie.ui.theme.tint
@@ -99,9 +119,10 @@ class SendDictation(private val m: AppModel) : DictationTarget {
 
 /**
  * 发送到电脑: the target Mac on top, the records below, newest first; the
- * talk button at the bottom sends on letting go. What is being heard shows
- * first of all, pushing the records down. The list is lazy, as 30 days of
- * records can run long.
+ * dock at the bottom is 粘贴 ｜ 按住说话 ｜ 键盘. Talking sends on letting go;
+ * what is being heard shows first of all, pushing the records down. 键盘 and
+ * 粘贴 swap the dock for a text field above the keyboard, for text that was
+ * not spoken. The list is lazy, as 30 days of records can run long.
  */
 @Composable
 fun SendScreen(m: AppModel) {
@@ -112,7 +133,48 @@ fun SendScreen(m: AppModel) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focus = remember { FocusRequester() }
     DisposableEffect(talk) { onDispose { if (m.voice.busyWith(talk)) m.voice.abort() } }
+
+    // Typing: the draft stays when going back to talking. Neither outlives the
+    // activity (a theme change comes back to the dock), as the keyboard would not.
+    var typing by remember { mutableStateOf(false) }
+    var draft by remember { mutableStateOf(TextFieldValue("")) }
+    val typingNow = typing && m.online
+    // Pasting reads the clipboard only when asked; Android 12 and later say so with a toast.
+    fun paste(then: () -> Unit = {}) {
+        scope.launch {
+            val clip = clipboard.getClipEntry()?.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+            if (clip.isNullOrEmpty()) {
+                m.toast("剪贴板里没有文字")
+                return@launch
+            }
+            val t = draft.text
+            val s = draft.selection
+            val text = t.substring(0, s.min) + clip + t.substring(s.max)
+            draft = TextFieldValue(text, TextRange(s.min + clip.length))
+            then()
+        }
+    }
+    fun send() {
+        val t = typedText(draft.text)
+        if (t.isEmpty() || t.codePointCount(0, t.length) > MaxSendChars) return
+        draft = TextFieldValue("")
+        sends.send(t)
+    }
+    val ime = WindowInsets.ime
+    LaunchedEffect(typingNow) {
+        if (!typingNow) return@LaunchedEffect
+        focus.requestFocus()
+        keyboard?.show()
+        // Hiding the keyboard (the back key does so first) goes back to talking.
+        snapshotFlow { ime.getBottom(density) > 0 }.dropWhile { !it }.first { !it }
+        typing = false
+    }
+    BackHandler(typingNow) { typing = false }
 
     // A Mac's online state stays current while the page is open, as on the devices page.
     LaunchedEffect(Unit) {
@@ -136,7 +198,7 @@ fun SendScreen(m: AppModel) {
                 scope.launch { sends.refreshMacs() }
             }
             if (live == null && records.isEmpty()) {
-                Box(Modifier.fillMaxWidth().padding(top = 120.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.weight(1f).fillMaxWidth().padding(top = 120.dp), contentAlignment = Alignment.TopCenter) {
                     Text("还没有发送过", color = p.ink3, fontSize = 14.sp)
                 }
             } else {
@@ -144,7 +206,7 @@ fun SendScreen(m: AppModel) {
                     Modifier.weight(1f).fillMaxWidth(),
                     state = list,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = bottomGap() + 108.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (typingNow) 16.dp else bottomGap() + 108.dp),
                 ) {
                     item(key = "label") {
                         Text("最近", color = p.ink3, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp))
@@ -167,28 +229,127 @@ fun SendScreen(m: AppModel) {
                     }
                 }
             }
+            if (typingNow) Composer(draft, { draft = it }, focus, onVoice = { typing = false }, onPaste = { paste() }, onSend = { send() })
         }
-        if (m.online) {
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(Brush.verticalGradient(0f to Color.Transparent, .25f to p.bg))
-                    .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = bottomGap()),
-            ) {
-                HoldButton(m, talk, Modifier.fillMaxWidth().height(60.dp), idleText = "按住说话", recText = "松开发送", fontSize = 16.5.sp)
+        if (m.online && !typingNow) {
+            DockBar(Modifier.align(Alignment.BottomCenter)) {
+                DockSide(Icons.Clipboard, "粘贴") { paste { typing = true } }
+                HoldButton(m, talk, Modifier.weight(1f).height(56.dp), recText = "松开发送")
+                DockSide(Icons.Keyboard, "键盘") { typing = true }
             }
-            CancelHint(m, talk, Modifier.align(Alignment.BottomCenter).padding(bottom = bottomGap() + 74.dp))
+            CancelHint(m, talk, Modifier.align(Alignment.BottomCenter).padding(bottom = bottomGap() + 76.dp))
         }
-        SendSnack(m)
+        SendSnack(m, typingNow)
     }
     if (picking) TargetSheet(m) { picking = false }
 }
 
 @Composable
-private fun BoxScope.SendSnack(m: AppModel) {
+private fun BoxScope.SendSnack(m: AppModel, typing: Boolean) {
     m.snack?.let { s ->
-        Snack(s, onDone = { if (m.snack?.id == s.id) m.snack = null }, Modifier.align(Alignment.BottomCenter).padding(bottom = bottomGap() + 86.dp))
+        Snack(s, onDone = { if (m.snack?.id == s.id) m.snack = null },
+            Modifier.align(Alignment.BottomCenter).then(
+                if (typing) Modifier.windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)).padding(bottom = 76.dp)
+                else Modifier.padding(bottom = bottomGap() + 82.dp),
+            ))
+    }
+}
+
+/**
+ * Above the keyboard while typing (.compose): the microphone goes back to
+ * talking; the field grows to six lines, then scrolls; Enter is a new line,
+ * so only the arrow sends. 粘贴 sits in the field while it is empty. Past
+ * the server's cap the arrow greys out and a red line says by how much.
+ */
+@Composable
+private fun Composer(
+    value: TextFieldValue,
+    onChange: (TextFieldValue) -> Unit,
+    focus: FocusRequester,
+    onVoice: () -> Unit,
+    onPaste: () -> Unit,
+    onSend: () -> Unit,
+) {
+    val p = Tokens.palette
+    val text = value.text
+    val count = text.codePointCount(0, text.length)
+    val over = count > MaxSendChars
+    val ready = text.isNotBlank() && !over
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(p.surface)
+            .drawBehind { drawLine(p.line, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) }
+            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
+    ) {
+        if (over) {
+            Text(
+                "最多 ${"%,d".format(MaxSendChars)} 字，现在 ${"%,d".format(count)} 字",
+                color = p.rec, fontSize = 13.sp,
+                modifier = Modifier.padding(start = 54.dp, end = 16.dp, top = 8.dp),
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(start = 2.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Box(Modifier.size(44.dp).pressable(CircleShape, onClick = onVoice), contentAlignment = Alignment.Center) {
+                Ico(Icons.Mic, p.ink2)
+            }
+            Row(
+                Modifier
+                    .weight(1f)
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(p.chip)
+                    .padding(start = 16.dp, end = 6.dp),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                val style = TextStyle(color = p.ink, fontSize = 16.sp, lineHeight = 24.sp)
+                BasicTextField(
+                    value, onChange,
+                    textStyle = style,
+                    cursorBrush = SolidColor(p.accent),
+                    maxLines = 6,
+                    modifier = Modifier.weight(1f).padding(vertical = 10.dp).focusRequester(focus),
+                    decorationBox = { inner ->
+                        Box {
+                            if (text.isEmpty()) Text("输入或粘贴文字", style = style.copy(color = p.ink3))
+                            inner()
+                        }
+                    },
+                )
+                if (text.isEmpty()) {
+                    Row(
+                        Modifier
+                            .padding(vertical = 6.dp)
+                            .height(32.dp)
+                            .clip(CircleShape)
+                            .background(p.surface)
+                            .border(1.dp, p.line, CircleShape)
+                            .pressable(CircleShape, onClick = onPaste)
+                            .padding(start = 9.dp, end = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Ico(Icons.Clipboard, p.ink2, 16.dp)
+                        Text("粘贴", color = p.ink2, fontSize = 14.sp)
+                    }
+                }
+            }
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(if (ready) p.accent else p.chip)
+                    .then(if (ready) Modifier.pressable(CircleShape, onClick = onSend) else Modifier),
+                contentAlignment = Alignment.Center,
+            ) {
+                Ico(Icons.ArrowUp, if (ready) Color.White else p.ink3)
+            }
+        }
     }
 }
 

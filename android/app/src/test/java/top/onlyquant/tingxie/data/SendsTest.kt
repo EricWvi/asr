@@ -41,4 +41,10 @@ class SendsTest {
         assertEquals("电脑没有响应", sendFailure(ApiError(504, "电脑没有响应")))
         assertEquals("网络连接失败", sendFailure(IOException()))
     }
+
+    @Test fun typedTextLosesBlankEdgesButKeepsIndentation() {
+        assertEquals("    val x = 1\n\n    val y = 2", typedText("\n  \r\n    val x = 1\n\n    val y = 2  \n\n"))
+        assertEquals("", typedText(" \n\t\n "))
+        assertEquals("一行", typedText("一行"))
+    }
 }

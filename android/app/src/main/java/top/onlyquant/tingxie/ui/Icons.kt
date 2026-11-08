@@ -41,6 +41,8 @@ object Icons {
     val X by lazy { icon("x", "M6 6l12 12M18 6L6 18") }
     val Back by lazy { icon("back", "M15 5l-7 7 7 7") }
     val Plus by lazy { icon("plus", "M12 5v14M5 12h14") }
+    val Clipboard by lazy { icon("clipboard", "M7.0 4.5h10.0a2.0 2.0 0 0 1 2.0 2.0v12.0a2.0 2.0 0 0 1 -2.0 2.0h-10.0a2.0 2.0 0 0 1 -2.0 -2.0v-12.0a2.0 2.0 0 0 1 2.0 -2.0z M9 4.5h6v3H9z") }
+    val ArrowUp by lazy { icon("arrow-up", "M12 19V5M6 11l6-6 6 6") }
     val ChevUp by lazy { icon("chev-up", "M6 15l6-6 6 6") }
     val ChevDown by lazy { icon("chev-down", "M6 9l6 6 6-6") }
     val Laptop by lazy { icon("laptop", "M5.5 5.0h13.0a1.5 1.5 0 0 1 1.5 1.5v8.0a1.5 1.5 0 0 1 -1.5 1.5h-13.0a1.5 1.5 0 0 1 -1.5 -1.5v-8.0a1.5 1.5 0 0 1 1.5 -1.5z M2 19h20") }

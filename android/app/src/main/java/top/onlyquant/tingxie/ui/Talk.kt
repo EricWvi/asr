@@ -23,7 +23,10 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -45,6 +48,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -206,5 +210,41 @@ fun CancelHint(m: AppModel, target: DictationTarget, modifier: Modifier) {
     ) {
         Ico(Icons.ChevUp, p.ink2, 16.dp)
         Text("上滑取消", color = p.ink2, fontSize = 13.sp)
+    }
+}
+
+/** The floating bar at the bottom (.dock): a side button either side of 按住说话. */
+@Composable
+fun DockBar(modifier: Modifier, content: @Composable RowScope.() -> Unit) {
+    val p = Tokens.palette
+    Row(
+        modifier
+            .padding(start = 14.dp, end = 14.dp, bottom = bottomGap())
+            .fillMaxWidth()
+            .shadow(28.dp, CircleShape, ambientColor = Color.Black.copy(alpha = .22f), spotColor = Color.Black.copy(alpha = if (p.dark) .6f else .22f))
+            .background(p.surface.copy(alpha = .96f), CircleShape)
+            .border(1.dp, p.line, CircleShape)
+            .padding(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        content = content,
+    )
+}
+
+/** A labelled side button of the dock (.dock-side). */
+@Composable
+fun DockSide(icon: ImageVector, label: String, disabled: Boolean = false, busy: Boolean = false, onClick: () -> Unit) {
+    val p = Tokens.palette
+    Column(
+        Modifier
+            .width(84.dp)
+            .height(52.dp)
+            .pressable(CircleShape, onClick = onClick)
+            .dim(disabled),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
+    ) {
+        if (busy) Spinner(p.ink2, 18.dp) else Ico(icon, p.ink2, 18.dp)
+        Text(label, color = p.ink2, fontSize = 12.sp, lineHeight = 16.sp)
     }
 }

@@ -781,40 +781,12 @@ private fun ColorPopup(current: String, onPick: (String) -> Unit, onDismiss: () 
 /** The floating bar in view mode: 整理 ｜ 按住说话 ｜ 键盘. */
 @Composable
 private fun Dock(m: AppModel, doc: Doc, talk: DocDictation, onKeyboard: () -> Unit, modifier: Modifier) {
-    val p = Tokens.palette
-    Row(
-        modifier
-            .padding(start = 14.dp, end = 14.dp, bottom = bottomGap())
-            .fillMaxWidth()
-            .shadow(28.dp, CircleShape, ambientColor = Color.Black.copy(alpha = .22f), spotColor = Color.Black.copy(alpha = if (p.dark) .6f else .22f))
-            .background(p.surface.copy(alpha = .96f), CircleShape)
-            .border(1.dp, p.line, CircleShape)
-            .padding(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
+    DockBar(modifier) {
         val pending = doc.tidyRanges.fitting(doc.content).isNotEmpty()
         val tidying = m.tidier.busyWith == doc.id
         DockSide(Icons.Sparkle, if (tidying) "整理中" else "整理", disabled = !pending && !tidying, busy = tidying) { tapTidy(m, doc, talk) }
         HoldButton(m, talk, Modifier.weight(1f).height(56.dp), off = tidying)
         DockSide(Icons.Keyboard, "键盘", onClick = onKeyboard)
-    }
-}
-
-@Composable
-private fun DockSide(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, disabled: Boolean = false, busy: Boolean = false, onClick: () -> Unit) {
-    val p = Tokens.palette
-    Column(
-        Modifier
-            .width(84.dp)
-            .height(52.dp)
-            .pressable(CircleShape, onClick = onClick)
-            .dim(disabled),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
-    ) {
-        if (busy) Spinner(p.ink2, 18.dp) else Ico(icon, p.ink2, 18.dp)
-        Text(label, color = p.ink2, fontSize = 12.sp, lineHeight = 16.sp)
     }
 }
 
