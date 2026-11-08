@@ -391,6 +391,11 @@ svg { display: block; }
 .cm .ln.quote.last { padding-bottom: 10px; border-radius: 0 0 12px 12px; }
 .cm .ln.quote.first.last { border-radius: 12px; }
 .cm .mk.qm { margin-right: .5em; }
+/* 引用里的列表：从引用的内边距起缩进；光标行的 > 挂在引用左内边距里居中，排在列表标记前面，和源码顺序一致 */
+.cm .ln.quote.li { padding-left: calc(16px + 1.4em); }
+.cm .quote .lm { left: calc(16px + 0.15em); }
+.cm .quote.li .rd.lm { left: 16px; }
+.cm .mk.qm.qh { position: absolute; left: calc((16px - 0.6em) / 2); margin-right: 0; }
 /* 分隔线：非光标时画一条线，行高不变 */
 .cm .ln.hr:not(.cur)::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--line); }
 /* 围栏代码块：等宽浅底；光标不在块内时，围栏行收成上下内边距，语言名挂在右上角 */
@@ -798,7 +803,9 @@ kbd {
           <div class="ln oli"><span class="mk lm">2.</span><span class="rd lm">2.</span>再买高铁票</div>
           <div class="ln blank"></div>
           <div class="ln quote first" data-at="quote"><span class="mk qm">&gt;</span>上次的教训：别在周日下午四点以后返程，</div>
-          <div class="ln quote last"><span class="mk qm">&gt;</span>G60 会堵成停车场。</div>
+          <div class="ln quote"><span class="mk qm">&gt;</span>G60 会堵成停车场。</div>
+          <div class="ln quote li"><span class="mk qm qh">&gt;</span><span class="mk lm">-</span><span class="rd lm"></span>宁可周日早上 7 点前出发</div>
+          <div class="ln quote li last" data-at="qli"><span class="mk qm qh">&gt;</span><span class="mk lm">-</span><span class="rd lm"></span></div>
           <div class="ln blank"></div>
           <div class="ln hr" data-at="hr"><span class="mk">---</span></div>
           <div class="ln blank"></div>
@@ -1344,7 +1351,7 @@ $('cropSave').onclick = () => {
 // #tidy-empty（没有待整理的文字）、#tidy-error（整理失败），
 // #search（搜索「猫」）、#search-empty（没有结果）、#search-hit（打开结果后正文里的命中）、#search-hit-mark（落选：mark 色），
 // #user-menu（用户菜单）、#devices（设备）、#devices-revoke（确认吊销）、#devices-empty（没有设备），
-// #source（落选变体）、#at-mark/li/task/quote/hr/code/table/img（光标所在行），可组合
+// #source（落选变体）、#at-mark/li/task/quote/qli/hr/code/table/img（光标所在行，qli 是引用里的空列表项），可组合
 const hash = location.hash;
 if (hash.includes('source')) { cm.hidden = true; $('source-variant').hidden = false; }
 const at = hash.match(/at-(\w+)/);
@@ -1411,7 +1418,7 @@ if (hash.includes('select')) {
     ['基础', [['默认', ''], ['滚动后吸顶', 'scrolled'], ['选中文字', 'select'], ['取色板', 'colors'], ['落选：全部显示源码', 'source']]],
     ['侧栏', [['右键菜单', 'menu'], ['行内重命名', 'rename'], ['删除后撤销', 'toast'], ['只看天空色', 'only-sky'], ['列表滚到下面', 'listdown'], ['打开玫瑰色文稿', 'rose']]],
     ['置顶', [['取消置顶菜单', 'menu-pinned'], ['只看桃色', 'only-peach'], ['落选：行内图钉', 'pin-icon']]],
-    ['光标行', [['高亮和链接', 'at-mark'], ['列表', 'at-li'], ['待办', 'at-task'], ['引用', 'at-quote'], ['分隔线', 'at-hr'], ['代码块', 'at-code'], ['表格', 'at-table'], ['图片', 'at-img']]],
+    ['光标行', [['高亮和链接', 'at-mark'], ['列表', 'at-li'], ['待办', 'at-task'], ['引用', 'at-quote'], ['引用中的列表', 'at-qli'], ['分隔线', 'at-hr'], ['代码块', 'at-code'], ['表格', 'at-table'], ['图片', 'at-img']]],
     ['语音', [['语音模式', 'voice'], ['录音中', 'rec'], ['最后 30 秒', 'countdown'], ['识别中断', 'asr-error'], ['没有麦克风权限', 'mic-denied'], ['没有麦克风', 'no-mic']]],
     ['整理', [['悬停整理', 'tidy-peek'], ['落选：淡色底', 'tidy-peek-fill'], ['整理中', 'tidying'], ['落选：呼吸', 'tidying-pulse'], ['整理完成', 'tidied'], ['没有待整理', 'tidy-empty'], ['整理失败', 'tidy-error']]],
     ['设备', [['用户菜单', 'user-menu'], ['设备', 'devices'], ['确认吊销', 'devices-revoke'], ['没有设备', 'devices-empty']]],
