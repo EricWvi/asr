@@ -103,6 +103,31 @@ private fun margins(n: ASTNode): Pair<Dp, Dp> = when (n.type) {
 
 private fun ASTNode.isBlank() = type == MarkdownTokenTypes.EOL || type == MarkdownTokenTypes.WHITE_SPACE
 
+/** Height of one blank line past the one that separates two blocks. */
+private val blankLine = 12.dp
+
+/**
+ * Top-level blocks, each with the number of blank lines above it. Markdown
+ * collapses them, but like the web editor (.cm-md-blank) every one keeps
+ * its height.
+ */
+internal fun blocks(children: List<ASTNode>): List<Pair<ASTNode, Int>> {
+    val out = mutableListOf<Pair<ASTNode, Int>>()
+    var eols = 0
+    for (n in children) {
+        when {
+            n.type == MarkdownTokenTypes.EOL -> eols++
+            n.isBlank() -> {}
+            else -> {
+                // Between blocks the first EOL ends the line above; at the top every one is blank.
+                out += n to if (out.isEmpty()) eols else maxOf(eols - 1, 0)
+                eols = 0
+            }
+        }
+    }
+    return out
+}
+
 /**
  * @param server resolves site-relative image links (/api/images/…).
  * @param hits search words to mark in the text.
@@ -211,10 +236,11 @@ fun MarkdownView(
             Column(mod) {
                 var below = 0.dp
                 var first = true
-                for (node in state.node.children) {
-                    if (node.isBlank()) continue
+                for ((node, blanks) in blocks(state.node.children)) {
                     val (top, bottom) = margins(node)
-                    Spacer(Modifier.height(if (first) 0.dp else maxOf(top, below)))
+                    // One blank line is the block gap itself; the rest add their own height.
+                    val extra = blankLine * (if (first) blanks else maxOf(blanks - 1, 0))
+                    Spacer(Modifier.height((if (first) 0.dp else maxOf(top, below)) + extra))
                     first = false
                     below = bottom
                     Box(
