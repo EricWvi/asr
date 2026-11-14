@@ -652,10 +652,13 @@ private fun tapTidy(m: AppModel, doc: Doc, talk: DocDictation) {
 /** Flips "[ ]" and "[x]" at the given offset of the source. */
 private fun toggleTask(m: AppModel, doc: Doc, at: Int) {
     // The renderer keeps its first callback, so [doc] may be old: edit what is there now.
-    val c = m.library.doc(doc.id)?.content ?: return
+    val d = m.library.doc(doc.id) ?: return
+    val c = d.content
     if (at + 1 >= c.length || c[at] != '[') return
     val now = if (c[at + 1] == ' ') 'x' else ' '
-    m.library.edit(doc.id, DocPatch(content = c.substring(0, at + 1) + now + c.substring(at + 2)))
+    // An edit by hand, as on the web: a box inside dictated text drops its mark.
+    val ranges = d.tidyRanges.fitting(c).mapped(Change(at + 1, at + 2, 1), manual = true)
+    m.library.edit(doc.id, DocPatch(content = c.substring(0, at + 1) + now + c.substring(at + 2), tidyRanges = ranges))
 }
 
 @Composable
