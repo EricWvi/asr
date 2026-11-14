@@ -40,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -451,9 +450,10 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
                         bodyHeight = it.size.height
                     }
                     .graphicsLayer { alpha = if (placing) 0f else 1f }
-                    .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 200.dp)
-                    .then(if (sweep != null) Modifier.drawWithContent { shimmer.at(sweep.value); drawContent() } else Modifier),
+                    .padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 200.dp),
             ) {
+                // Each text lines the band up with the screen itself (glowAnchor).
+                androidx.compose.runtime.CompositionLocalProvider(LocalGlow provides remember(shimmer, sweep) { sweep?.let { s -> Glow(shimmer) { s.value } } }) {
                 if (editing) {
                     Editor(
                         value, ::onEdit, hl,
@@ -485,6 +485,7 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
                             modifier = tapper,
                         )
                     }
+                }
                 }
             }
         }
@@ -561,6 +562,7 @@ private fun Editor(
         onTextLayout = { l = it; onLayout(it) },
         modifier = modifier
             .fillMaxWidth()
+            .glowAnchor()
             .drawBehind {
                 val lay = l ?: return@drawBehind
                 val len = lay.layoutInput.text.length

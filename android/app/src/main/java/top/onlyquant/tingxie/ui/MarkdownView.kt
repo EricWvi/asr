@@ -318,7 +318,7 @@ private fun AnnotatedString.trimmed(): AnnotatedString {
 private fun Heading(content: String, node: ASTNode, style: TextStyle) {
     // ATX: [ATX_HEADER, ATX_CONTENT]; setext: [SETEXT_CONTENT, EOL, SETEXT_n].
     val inner = node.children.firstOrNull { it.type == MarkdownTokenTypes.ATX_CONTENT || it.type == MarkdownTokenTypes.SETEXT_CONTENT } ?: return
-    Text(inline(content, inner, style).trimmed(), style = style)
+    Text(inline(content, inner, style).trimmed(), style = style, modifier = Modifier.glowAnchor())
 }
 
 /** A paragraph, or a picture when it holds nothing but one image. */
@@ -341,7 +341,7 @@ private fun Paragraph(content: String, node: ASTNode, server: String) {
             return
         }
     }
-    MarkdownParagraph(content, node, style = LocalMarkdownTypography.current.paragraph)
+    MarkdownParagraph(content, node, Modifier.glowAnchor(), style = LocalMarkdownTypography.current.paragraph)
 }
 
 private fun ASTNode.findDest(content: String): String? {
@@ -555,7 +555,7 @@ private fun Table(content: String, node: ASTNode) {
                         }, contentAlignment = aligns.getOrNull(ci) ?: Alignment.CenterStart) {
                             Text(
                                 if (cell == null) AnnotatedString("") else inline(content, cell, s).trimmed(),
-                                style = s, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp, end = if (ci == cols - 1) 0.dp else 14.dp),
+                                style = s, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp, end = if (ci == cols - 1) 0.dp else 14.dp).glowAnchor(),
                             )
                         }
                     }
