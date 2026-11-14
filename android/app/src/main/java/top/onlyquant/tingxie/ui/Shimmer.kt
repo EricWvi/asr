@@ -20,10 +20,14 @@ import androidx.compose.ui.layout.positionInRoot
  * text with a band of the document's deep colour passing over it every
  * [period] pixels. One shader serves all the text; [at] moves it, and
  * whatever draws the text has to be redrawn for each frame.
+ *
+ * The band stands upright: a Text draws each of its paragraphs (one per
+ * line break) moved further down, which a slanted band would show as a
+ * break at every line; an upright one does not change with height.
  */
 class Shimmer(base: Color, glow: Color, private val period: Float) : ShaderBrush() {
     private val shader = LinearGradientShader(
-        Offset.Zero, Offset(period, period * .18f),
+        Offset.Zero, Offset(period, 0f),
         listOf(base, base, glow, base, base), listOf(0f, .38f, .5f, .62f, 1f),
         TileMode.Repeated,
     )
@@ -36,7 +40,7 @@ class Shimmer(base: Color, glow: Color, private val period: Float) : ShaderBrush
      * all of them share one band, as background-attachment: fixed does.
      */
     fun at(t: Float, origin: Offset = Offset.Zero) {
-        matrix.setTranslate(period * (1 - t) - origin.x, -origin.y)
+        matrix.setTranslate(period * (1 - t) - origin.x, 0f)
         shader.setLocalMatrix(matrix)
     }
 
