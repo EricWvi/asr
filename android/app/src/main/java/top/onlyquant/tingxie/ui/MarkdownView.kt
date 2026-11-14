@@ -271,9 +271,9 @@ fun MarkdownView(
 
 /**
  * Where a block's text is: its words begin at [textStart] in the source, past
- * marks such as "## ", and at ([x], [y]) in the view.
+ * marks such as "## ", and at ([x], [y]) in the view, [height] tall.
  */
-data class BlockPos(val start: Int, val end: Int, val textStart: Int, val x: Float, val y: Float)
+data class BlockPos(val start: Int, val end: Int, val textStart: Int, val x: Float, val y: Float, val height: Float)
 
 private class Reporter {
     var report: ((BlockPos) -> Unit)? = null
@@ -295,7 +295,7 @@ private fun Modifier.reportBlock(node: ASTNode, textStart: Int = node.startOffse
     return onGloballyPositioned { c ->
         val root = r.root?.takeIf { it.isAttached } ?: return@onGloballyPositioned
         val at = root.localPositionOf(c, Offset.Zero)
-        r.report?.invoke(BlockPos(node.startOffset, node.endOffset, textStart, at.x, at.y))
+        r.report?.invoke(BlockPos(node.startOffset, node.endOffset, textStart, at.x, at.y, c.size.height.toFloat()))
     }
 }
 

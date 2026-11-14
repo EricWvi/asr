@@ -153,12 +153,35 @@ fun DocScreen(m: AppModel, route: Route.Doc) {
     }
 }
 
-/** Where a tap on the rendered text landed: the block, and the point within it. */
 /** A tap on [start, end) of the source, at [dx], [dy] from where its words begin on screen, which is [blockY]. */
 private data class Tap(val start: Int, val end: Int, val blockY: Float, val dx: Float, val dy: Float)
 
 /** A block of text in view mode, its words starting at [textStart] in the source and at [x], [y] on screen. */
-private data class Block(val start: Int, val end: Int, val textStart: Int, val x: Float, val y: Float)
+private data class Block(val start: Int, val end: Int, val textStart: Int, val x: Float, val y: Float, val height: Float) {
+    val bottom get() = y + height
+}
+
+/**
+ * Where a tap between two blocks goes in [text]: onto one of the blank lines
+ * between the block ending at [prevEnd] and the one starting at [nextStart]
+ * (null at the top or bottom of the text), picked by how far down the gap
+ * the tap was ([frac], 0 to 1). With no blank line there, the end of the
+ * block above, or else the start of the one below.
+ */
+internal fun gapOffset(text: String, prevEnd: Int?, nextStart: Int?, frac: Float): Int {
+    val from = if (prevEnd == null) 0 else text.indexOf('\n', prevEnd).let { if (it < 0) text.length + 1 else it + 1 }
+    // The start of the line the block below begins on; past the end there is no block below.
+    val until = if (nextStart == null) text.length + 1 else text.lastIndexOf('\n', (nextStart - 1).coerceAtLeast(0)).let { if (nextStart == 0) 0 else it + 1 }
+    val lines = mutableListOf<Int>()
+    var at = from
+    while (at < until && at <= text.length) {
+        val end = text.indexOf('\n', at).let { if (it < 0) text.length else it }
+        if (text.substring(at, end).isBlank()) lines += at
+        at = end + 1
+    }
+    if (lines.isEmpty()) return prevEnd ?: nextStart ?: 0
+    return lines[(frac * lines.size).toInt().coerceIn(0, lines.size - 1)]
+}
 
 /** Leaving edit mode: the text at [offset] stays where it is on screen once rendered. */
 private data class Exit(val offset: Int, val layout: TextLayoutResult, val scrollY: Int, val height: Int)
@@ -472,10 +495,21 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
                     val tapper = Modifier.pointerInput(m.online) {
                         detectTapGestures { o ->
                             if (!m.online) return@detectTapGestures
-                            val b = blocks.values.filter { it.y <= o.y }.maxByOrNull { it.y }
-                            tap = if (b == null) null else Tap(b.textStart, b.end, b.y, o.x - b.x, o.y - b.y)
-                            placing = b != null
-                            startEditing(if (b == null) doc.content.length else null)
+                            val sorted = blocks.values.sortedBy { it.y }
+                            val b = sorted.lastOrNull { it.y <= o.y && o.y < it.bottom }
+                            tap = if (b != null) {
+                                Tap(b.textStart, b.end, b.y, o.x - b.x, o.y - b.y)
+                            } else {
+                                // Between blocks: onto the blank line there, as on the web.
+                                val prev = sorted.lastOrNull { it.bottom <= o.y }
+                                val next = sorted.firstOrNull { it.y > o.y }
+                                val top = prev?.bottom ?: 0f
+                                val frac = if (next == null || next.y <= top) 1f else (o.y - top) / (next.y - top)
+                                val at = gapOffset(shown, prev?.end, next?.start, frac)
+                                Tap(at, at, o.y, 0f, 0f)
+                            }
+                            placing = true
+                            startEditing(null)
                         }
                     }
                     if (shown.isBlank()) {
@@ -486,7 +520,7 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
                             onToggle = { off -> toggleTask(m, doc, off) },
                             overlays = overlays,
                             freshAlpha = { talk.freshAlpha.value },
-                            onBlock = { b -> blocks[b.start] = Block(b.start, b.end, b.textStart, b.x, b.y) },
+                            onBlock = { b -> blocks[b.start] = Block(b.start, b.end, b.textStart, b.x, b.y, b.height) },
                             modifier = tapper,
                         )
                     }
