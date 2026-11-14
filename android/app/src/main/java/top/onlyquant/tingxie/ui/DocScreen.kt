@@ -624,9 +624,15 @@ private fun Tools(m: AppModel, doc: Doc, talk: DocDictation, onHide: () -> Unit)
             }
         }
         HoldButton(m, talk, Modifier.weight(1f).height(42.dp), fontSize = 15.sp, glow = 4.dp, shadow = false, off = tidying)
+        // Mirrors 整理: the word, then the icon on the outer edge.
         Box(Modifier.width(TOOL_SIDE), contentAlignment = Alignment.CenterEnd) {
-            Box(Modifier.size(44.dp).pressable(CircleShape, onClick = onHide), contentAlignment = Alignment.Center) {
-                Ico(Icons.KbHide, p.ink2)
+            Row(
+                Modifier.height(44.dp).pressable(CircleShape, onClick = onHide).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text("键盘", color = p.ink2, fontSize = 14.sp)
+                Ico(Icons.KbHide, p.ink2, 18.dp)
             }
         }
     }
