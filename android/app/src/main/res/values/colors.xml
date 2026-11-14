@@ -1,5 +1,7 @@
 <resources>
     <!-- paper in design/android.html -->
     <color name="paper">#FFFFFDF5</color>
+    <!-- One colour in light and dark: launchers cache the icon as first drawn
+         and keep it until the app updates, so a dark one could stick. -->
     <color name="ic_launcher_background">#FFFFFDF5</color>
 </resources>
