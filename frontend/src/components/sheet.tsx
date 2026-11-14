@@ -93,9 +93,8 @@ function Body({ id }: { id: number }) {
       key={id}
       docId={id}
       initial={data.content}
-      initialSpans={data.tidy_ranges}
       revision={revision}
-      onChange={(content, spans) => edit(id, { content, tidy_ranges: spans })}
+      onChange={(content) => edit(id, { content })}
     />
   );
 }

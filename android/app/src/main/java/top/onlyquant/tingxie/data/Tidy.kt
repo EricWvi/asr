@@ -161,7 +161,7 @@ class Tidier(
         }
         val lib = library()
         val d = lib.doc(id) ?: return
-        val segs = segmentsOf(d.content, d.tidyRanges)
+        val segs = segmentsOf(d.content, lib.marks(id))
         if (segs.isEmpty()) {
             toast("没有待整理的文字", null, null)
             return
@@ -217,15 +217,15 @@ class Tidier(
             note?.let { toast(it, null, null) }
             return
         }
-        val spans = before.tidyRanges.fitting(before.content)
+        val spans = lib.marks(id)
         val r = replaceSegments(before.content, spans, results)
-        lib.edit(id, DocPatch(content = r.content, tidyRanges = r.spans))
+        lib.edit(id, DocPatch(content = r.content), marks = r.spans)
         onPlaced(id, r.placed)
         undoable = id
         toast(note ?: "已整理", "撤销") {
             if (undoable != id || lib.doc(id)?.content != r.content) return@toast
             undoable = null
-            lib.edit(id, DocPatch(content = before.content, tidyRanges = spans))
+            lib.edit(id, DocPatch(content = before.content), marks = spans)
             onPlaced(id, emptyList())
         }
     }

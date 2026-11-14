@@ -109,7 +109,7 @@ class Library(private val api: Api, private val dir: File, private val scope: Co
         val d = runCatching { api.document(id) }.getOrNull() ?: return false
         // Any local edit meanwhile replaced the cached copy.
         if (dirty(id) || !quiet() || docs[id] !== cached) return false
-        if (d.content == cached.content && d.tidyRanges == cached.tidyRanges && d.title == cached.title && d.color == cached.color) return false
+        if (d.content == cached.content && d.title == cached.title && d.color == cached.color) return false
         docs[id] = d
         write("doc-$id.json", d)
         return true
@@ -118,12 +118,37 @@ class Library(private val api: Api, private val dir: File, private val scope: Co
     /** Hears every change to a document's text, before it is applied. */
     var onContent: (Long, Change) -> Unit = { _, _ -> }
 
-    /** Applies an edit locally and schedules saving it. Colours save at once. */
-    fun edit(id: Long, patch: DocPatch) {
+    /*
+     * Dictated text awaiting tidying, per document: only in memory, never
+     * saved, and dropped when the document's page closes. Each set of marks
+     * goes with the text it marks, so a change made any other way (a reload
+     * from the server) leaves none behind on text they no longer fit.
+     */
+    private val marked = mutableStateMapOf<Long, Pair<String, List<Span>>>()
+
+    /** The marks on the document's current text. */
+    fun marks(id: Long): List<Span> {
+        val (text, spans) = marked[id] ?: return emptyList()
+        return if (docs[id]?.content == text) spans.fitting(text) else emptyList()
+    }
+
+    fun dropMarks(id: Long) {
+        marked.remove(id)
+    }
+
+    /**
+     * Applies an edit locally and schedules saving it. Colours save at once.
+     * [marks], if given, replace the document's marks on its new text.
+     */
+    fun edit(id: Long, patch: DocPatch, marks: List<Span>? = null) {
         val old = docs[id]?.content
         if (old != null && patch.content != null) Change.between(old, patch.content)?.let { onContent(id, it) }
         docs[id]?.let { docs[id] = it.apply(patch) }
-        list?.let { l -> list = l.map { if (it.id == id) it.apply(patch.copy(content = null, tidyRanges = null)) else it } }
+        if (marks != null) {
+            val text = docs[id]?.content
+            if (text != null && marks.isNotEmpty()) marked[id] = text to marks else marked.remove(id)
+        }
+        list?.let { l -> list = l.map { if (it.id == id) it.apply(patch.copy(content = null)) else it } }
         pending[id] = pending[id]?.merge(patch) ?: patch
         write("pending.json", pending.toMap())
         status[id] = SaveStatus.Saving
@@ -245,7 +270,6 @@ fun Doc.apply(p: DocPatch) = copy(
     title = p.title ?: title,
     color = p.color ?: color,
     content = p.content ?: content,
-    tidyRanges = p.tidyRanges ?: tidyRanges,
     updatedAt = if (p.title != null || p.content != null) Instant.now().toString() else updatedAt,
 )
 
@@ -254,7 +278,6 @@ fun DocPatch.merge(later: DocPatch) = DocPatch(
     title = later.title ?: title,
     color = later.color ?: color,
     content = later.content ?: content,
-    tidyRanges = later.tidyRanges ?: tidyRanges,
 )
 
 suspend fun <T> io(block: suspend () -> T): T = withContext(Dispatchers.IO) { block() }

@@ -117,7 +117,7 @@ const invertMarks = invertedEffects.of((tr) => {
 
 export const tidyRanges: Extension = [untidied, invertMarks];
 
-/** Sets up the marks of a freshly opened document, ignoring any that do not fit its text. */
+/** Sets up the marks of a document opened again, ignoring any that do not fit its text. */
 export function initialTidyRanges(spans: readonly Span[] | undefined, length: number): Extension {
   const marks: Mark[] = [];
   for (const [from, to] of spans ?? []) {
@@ -126,9 +126,28 @@ export function initialTidyRanges(spans: readonly Span[] | undefined, length: nu
   return untidied.init(() => ({ marks, show: "none" }));
 }
 
-/** The marked stretches, for saving with the text. */
+/** The marked stretches. */
 export function spansOf(state: EditorState): Span[] {
   return state.field(untidied, false)?.marks.map((m): Span => [m.from, m.to]) ?? [];
+}
+
+/*
+ * The marks live only in this tab, never on the server: kept per document
+ * so switching away and back finds them again, and gone with the tab.
+ */
+const kept = new Map<number, { text: string; spans: Span[] }>();
+
+/** The marks a document had when last open in this tab, if its text has not changed since. */
+export function keptSpans(id: number, text: string): Span[] | undefined {
+  const k = kept.get(id);
+  return k?.text === text ? k.spans : undefined;
+}
+
+/** Remembers a document's marks with its text; none forgets them. */
+export function keepSpans(id: number, state: EditorState) {
+  const spans = spansOf(state);
+  if (spans.length) kept.set(id, { text: state.doc.toString(), spans });
+  else kept.delete(id);
 }
 
 /** Effect that marks freshly dictated text. */

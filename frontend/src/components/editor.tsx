@@ -11,7 +11,7 @@ import { dedentListItem, exitEmptyListItem, indentListItem, splitAtItemStart } f
 import { livePreview } from "@/editor/live-preview";
 import { searchHits } from "@/editor/search-hits";
 import { codeStyle, highlightTag, markdownSupport } from "@/editor/syntax";
-import { initialTidyRanges, type Span, spansOf, tidyRanges } from "@/editor/tidy";
+import { initialTidyRanges, keepSpans, keptSpans, type Span, spansOf, tidyRanges, tidyRangesChanged } from "@/editor/tidy";
 import { registerEditor } from "@/lib/editor-focus";
 import { setPending } from "@/voice/tidy";
 
@@ -54,28 +54,27 @@ const markdownStyle = HighlightStyle.define([
 export function Editor({
   docId,
   initial,
-  initialSpans,
   revision,
   onChange,
 }: {
   docId: number;
   initial: string;
-  /** Dictated text awaiting tidying (editor/tidy.ts). */
-  initialSpans?: Span[];
-  /** Changing it starts the editor over from initial, keeping the cursor where it can. */
+  /**
+   * Changing it starts the editor over from initial, keeping the cursor
+   * where it can. The marks awaiting tidying go: they were for the old text.
+   */
   revision: number;
-  onChange: (content: string, spans: Span[]) => void;
+  onChange: (content: string) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const reload = useRef<(() => void) | null>(null);
   const changed = useRef(onChange);
   changed.current = onChange;
-  const latest = useRef({ initial, initialSpans });
-  latest.current = { initial, initialSpans };
+  const latest = useRef(initial);
+  latest.current = initial;
 
   // The editor owns its text after mount; remount it (key) for another document.
   useEffect(() => {
-    let saved = "";
     const create = (doc: string, spans: Span[] | undefined, cursor: number) =>
       EditorState.create({
         doc,
@@ -108,27 +107,22 @@ export function Editor({
           ]),
           theme,
           EditorView.updateListener.of((u) => {
-            // The marks save with the text; showing them changes nothing.
-            const spans = spansOf(u.state);
-            const key = JSON.stringify(spans);
-            if (u.docChanged || key !== saved) {
-              saved = key;
-              changed.current(u.state.doc.toString(), spans);
-            }
-            setPending(spans.length > 0);
+            if (u.docChanged) changed.current(u.state.doc.toString());
+            // The marks stay in this tab (editor/tidy.ts); showing them changes nothing.
+            if (u.docChanged || u.transactions.some(tidyRangesChanged)) keepSpans(docId, u.state);
+            setPending(spansOf(u.state).length > 0);
           }),
         ],
       });
-    const view = new EditorView({ parent: host.current!, state: create(initial, initialSpans, 0) });
+    const view = new EditorView({ parent: host.current!, state: create(initial, keptSpans(docId, initial), 0) });
     const loaded = () => {
-      saved = JSON.stringify(spansOf(view.state));
-      setPending(saved !== "[]");
+      keepSpans(docId, view.state);
+      setPending(spansOf(view.state).length > 0);
     };
     loaded();
     // Setting a state dispatches nothing, so the reloaded text is not saved back.
     reload.current = () => {
-      const { initial, initialSpans } = latest.current;
-      view.setState(create(initial, initialSpans, view.state.selection.main.head));
+      view.setState(create(latest.current, undefined, view.state.selection.main.head));
       loaded();
     };
     registerEditor(view, docId);

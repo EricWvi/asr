@@ -117,6 +117,10 @@ var migrations = []migration{
 	-- milliseconds; NULL when it is not pinned.
 	ALTER TABLE documents ADD COLUMN pinned_at INTEGER;
 	`),
+	execSQL(`
+	-- Text awaiting tidying now lives only in the client that dictated it.
+	ALTER TABLE documents DROP COLUMN tidy_ranges;
+	`),
 }
 
 func migrate(db *sql.DB) error {

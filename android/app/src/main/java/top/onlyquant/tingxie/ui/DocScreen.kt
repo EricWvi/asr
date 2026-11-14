@@ -185,6 +185,8 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
     val scope = rememberCoroutineScope()
     val talk = remember(doc.id) { DocDictation(m, doc.id, scope) }
     DisposableEffect(talk) { onDispose { if (m.voice.busyWith(talk)) m.voice.abort() } }
+    // Text awaiting tidying is kept only while its page is open.
+    DisposableEffect(doc.id) { onDispose { m.library.dropMarks(doc.id) } }
     DisposableEffect(talk) {
         m.tidier.onPlaced = { id, placed -> if (id == doc.id) talk.showFresh(placed) }
         onDispose { m.tidier.onPlaced = { _, _ -> } }
@@ -193,7 +195,7 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
     val tidying = m.tidier.busyWith == doc.id
     val shimmer = remember(p, t, density) { Shimmer(p.ink3, t.deep, with(density) { 600.dp.toPx() }) }
     val glowStyle = remember(shimmer) { SpanStyle(brush = shimmer) }
-    val glow = if (tidying) doc.tidyRanges.fitting(doc.content) else emptyList()
+    val glow = if (tidying) lib.marks(doc.id) else emptyList()
     val sweep = if (tidying) {
         androidx.compose.animation.core.rememberInfiniteTransition(label = "tidy").animateFloat(
             0f, 1f,
@@ -304,10 +306,9 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
         continueList(value.text, v.text, v.selection.start)?.let { (s, c) -> v = TextFieldValue(s, TextRange(c)) }
         if (v.text != value.text) {
             val ch = Change.between(value.text, v.text)!!
-            val cur = lib.doc(doc.id) ?: doc
-            val ranges = cur.tidyRanges.fitting(value.text).mapped(ch, manual = true)
+            val ranges = lib.marks(doc.id).mapped(ch, manual = true)
             talk.fresh = talk.fresh.mapNotNull { (a, b) -> (ch.map(a, 1) to ch.map(b, -1)).takeIf { it.first < it.second } }
-            lib.edit(doc.id, DocPatch(content = v.text, tidyRanges = ranges))
+            lib.edit(doc.id, DocPatch(content = v.text), marks = ranges)
         }
         value = v
     }
@@ -599,7 +600,7 @@ private val TOOL_SIDE = 92.dp
 @Composable
 private fun Tools(m: AppModel, doc: Doc, talk: DocDictation, onHide: () -> Unit) {
     val p = Tokens.palette
-    val pending = doc.tidyRanges.fitting(doc.content).isNotEmpty()
+    val pending = m.library.marks(doc.id).isNotEmpty()
     val tidying = m.tidier.busyWith == doc.id
     Row(
         Modifier
@@ -657,8 +658,8 @@ private fun toggleTask(m: AppModel, doc: Doc, at: Int) {
     if (at + 1 >= c.length || c[at] != '[') return
     val now = if (c[at + 1] == ' ') 'x' else ' '
     // An edit by hand, as on the web: a box inside dictated text drops its mark.
-    val ranges = d.tidyRanges.fitting(c).mapped(Change(at + 1, at + 2, 1), manual = true)
-    m.library.edit(doc.id, DocPatch(content = c.substring(0, at + 1) + now + c.substring(at + 2), tidyRanges = ranges))
+    val ranges = m.library.marks(doc.id).mapped(Change(at + 1, at + 2, 1), manual = true)
+    m.library.edit(doc.id, DocPatch(content = c.substring(0, at + 1) + now + c.substring(at + 2)), marks = ranges)
 }
 
 @Composable
@@ -808,7 +809,7 @@ private fun ColorPopup(current: String, onPick: (String) -> Unit, onDismiss: () 
 @Composable
 private fun Dock(m: AppModel, doc: Doc, talk: DocDictation, onKeyboard: () -> Unit, modifier: Modifier) {
     DockBar(modifier) {
-        val pending = doc.tidyRanges.fitting(doc.content).isNotEmpty()
+        val pending = m.library.marks(doc.id).isNotEmpty()
         val tidying = m.tidier.busyWith == doc.id
         DockSide(Icons.Sparkle, if (tidying) "整理中" else "整理", disabled = !pending && !tidying, busy = tidying) { tapTidy(m, doc, talk) }
         HoldButton(m, talk, Modifier.weight(1f).height(56.dp), off = tidying)
@@ -851,8 +852,8 @@ class DocDictation(private val m: AppModel, private val id: Long, private val sc
         val c = d.content
         val a = at.coerceIn(0, c.length)
         val b = a + text.length
-        val ranges = d.tidyRanges.fitting(c).mapped(Change(a, a, text.length), manual = false).plus(a, b)
-        m.library.edit(id, top.onlyquant.tingxie.data.DocPatch(content = c.substring(0, a) + text + c.substring(a), tidyRanges = ranges))
+        val ranges = m.library.marks(id).mapped(Change(a, a, text.length), manual = false).plus(a, b)
+        m.library.edit(id, top.onlyquant.tingxie.data.DocPatch(content = c.substring(0, a) + text + c.substring(a)), marks = ranges)
         showFresh(listOf(a to b))
         onWritten(a, b)
     }

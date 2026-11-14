@@ -206,15 +206,12 @@ func TestDocumentsAPI(t *testing.T) {
 		t.Errorf("bad color: status = %d", rec.Code)
 	}
 
-	// Ranges awaiting tidying travel with the content.
+	// Ranges awaiting tidying stay in the client; older clients still send them.
 	if rec := do(t, h, "PATCH", path, `{"content":"# 标题\n正文说话","tidy_ranges":[[7,9]]}`); rec.Code != http.StatusOK {
-		t.Fatalf("patch ranges: status = %d, body = %s", rec.Code, rec.Body)
+		t.Fatalf("patch with ranges: status = %d, body = %s", rec.Code, rec.Body)
 	}
-	if rec := do(t, h, "GET", path, ""); !strings.Contains(rec.Body.String(), `"tidy_ranges":[[7,9]]`) {
-		t.Fatalf("get ranges: body = %s", rec.Body)
-	}
-	if rec := do(t, h, "PATCH", path, `{"content":"短","tidy_ranges":[[7,9]]}`); rec.Code != http.StatusBadRequest {
-		t.Errorf("ranges past the end: status = %d", rec.Code)
+	if rec := do(t, h, "GET", path, ""); strings.Contains(rec.Body.String(), "tidy_ranges") {
+		t.Fatalf("get: ranges came back: body = %s", rec.Body)
 	}
 
 	// Search finds it by a word in the content, with a snippet.

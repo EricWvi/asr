@@ -23,9 +23,6 @@ const quiet = (id: number) =>
   useVoice.getState().phase === "idle" &&
   !useTidy.getState().busy;
 
-const same = (a: Doc, b: Doc) =>
-  a.content === b.content && JSON.stringify(a.tidy_ranges ?? []) === JSON.stringify(b.tidy_ranges ?? []);
-
 async function reloadCurrent() {
   const id = useWorkspace.getState().currentId;
   if (id === null) return;
@@ -39,7 +36,7 @@ async function reloadCurrent() {
     return;
   }
   // Any local edit meanwhile replaced the cached copy.
-  if (same(doc, cached) || !quiet(id) || queryClient.getQueryData(docKey(id)) !== cached) return;
+  if (doc.content === cached.content || !quiet(id) || queryClient.getQueryData(docKey(id)) !== cached) return;
   queryClient.setQueryData<Doc>(docKey(id), doc);
   useReloads.setState(({ revision }) => ({ revision: revision + 1 }));
 }

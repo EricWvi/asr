@@ -52,7 +52,6 @@ data class Doc(
     val color: String,
     val content: String = "",
     val snippet: String = "",
-    @SerialName("tidy_ranges") val tidyRanges: List<List<Int>> = emptyList(),
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String,
     /** When it was pinned to the top of the list; null when it is not pinned. */
@@ -67,7 +66,6 @@ data class DocPatch(
     val title: String? = null,
     val color: String? = null,
     val content: String? = null,
-    @SerialName("tidy_ranges") val tidyRanges: List<List<Int>>? = null,
 )
 
 @Serializable

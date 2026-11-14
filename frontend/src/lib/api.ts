@@ -20,13 +20,9 @@ export type DocSummary = {
   pinned_at?: string;
 };
 
-/** [from, to) offsets into a document's content. */
-export type Span = [number, number];
+export type Doc = DocSummary & { content: string };
 
-/** tidy_ranges is the dictated text awaiting tidying. */
-export type Doc = DocSummary & { content: string; tidy_ranges?: Span[] };
-
-export type DocPatch = Partial<Pick<Doc, "title" | "color" | "content" | "tidy_ranges">>;
+export type DocPatch = Partial<Pick<Doc, "title" | "color" | "content">>;
 
 /** A native client signed in as the user. Times are Unix milliseconds. */
 export type Device = {
