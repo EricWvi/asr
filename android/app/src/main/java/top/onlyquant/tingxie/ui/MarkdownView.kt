@@ -43,6 +43,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -90,6 +91,7 @@ import top.onlyquant.tingxie.ui.theme.Tokens
 private val bodySize = 17.sp
 private val bodyLine = 1.75.em
 private val mono = FontFamily.Monospace
+private val fullLines = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)
 
 /** Space above and below a top-level block, collapsing like CSS margins. */
 private fun margins(n: ASTNode): Pair<Dp, Dp> = when (n.type) {
@@ -147,11 +149,14 @@ fun MarkdownView(
     onBlock: ((startOffset: Int, endOffset: Int, y: Float) -> Unit)? = null,
 ) {
     val p = Tokens.palette
-    val text = TextStyle(fontSize = bodySize, lineHeight = bodyLine, color = p.ink)
+    // Every line keeps its full height, half the leading above and half below
+    // as in CSS. Compose trims it off the first and last lines by default, so a
+    // one-line list item came out shorter than a wrapped line inside one.
+    val text = TextStyle(fontSize = bodySize, lineHeight = bodyLine, color = p.ink, lineHeightStyle = fullLines)
     val typography = markdownTypography(
         h1 = text.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold, lineHeight = 1.35.em),
         h2 = text.copy(fontSize = 21.sp, fontWeight = FontWeight.W600, lineHeight = 1.4.em),
-        h3 = text.copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold, lineHeight = 1.5.em),
+        h3 = text.copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
         h4 = text.copy(fontWeight = FontWeight.SemiBold),
         h5 = text.copy(fontWeight = FontWeight.SemiBold),
         h6 = text.copy(fontWeight = FontWeight.SemiBold, color = p.ink2),
@@ -382,8 +387,11 @@ private fun MdList(content: String, node: ASTNode, ordered: Boolean, tint: Tint,
             if (item.type != MarkdownElementTypes.LIST_ITEM) continue
             val box = item.children.firstOrNull { it.type == GFMTokenTypes.CHECK_BOX }
             val done = box != null && box.getTextInNode(content).contains(Regex("\\[[xX]]"))
+            val first = index == 0
             val number = start + index++
-            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+            // As li { margin: 2px 0 } collapses: 2dp between items, none at
+            // the ends, except a nested list keeps 2dp below its parent's text.
+            Row(Modifier.fillMaxWidth().padding(top = if (first && depth == 0) 0.dp else 2.dp)) {
                 val onFirstLine = Modifier.alignBy { it.measuredHeight / 2 + glyphMid.roundToInt() }
                 when {
                     box != null -> TaskBox(done, onFirstLine) { onToggle(box.startOffset) }
