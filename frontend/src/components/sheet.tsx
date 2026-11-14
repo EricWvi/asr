@@ -38,8 +38,12 @@ export function Sheet({ doc }: { doc: DocSummary }) {
           <ChevronLeftIcon className="size-[18px]" strokeWidth={1.75} />
           文稿
         </button>
-        <div className="min-w-0 flex-1 translate-y-1 truncate text-[15px] font-semibold opacity-0 transition duration-200 group-data-scrolled/sheet:translate-y-0 group-data-scrolled/sheet:opacity-100">
-          {doc.title}
+        {/* Once scrolled: the title and its save state, so a long document need not go back to the top. */}
+        <div className="flex min-w-0 flex-1 translate-y-1 items-center gap-2 opacity-0 transition duration-200 group-data-scrolled/sheet:translate-y-0 group-data-scrolled/sheet:opacity-100">
+          <span className="min-w-0 truncate text-[15px] font-semibold">{doc.title}</span>
+          <span className="flex-none">
+            <SaveState id={doc.id} />
+          </span>
         </div>
         <div className="max-md:hidden">
           <ModeSwitch />

@@ -681,10 +681,18 @@ private fun DocBar(m: AppModel, doc: Doc?, scrolled: Boolean, onMore: () -> Unit
             Ico(Icons.Back, p.ink2, 26.dp)
             Text("文稿", color = p.ink2, fontSize = 16.sp)
         }
-        Text(
-            doc?.title ?: "", color = p.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).graphicsLayer { alpha = shadow; translationY = (1 - shadow) * 4.dp.toPx() },
-        )
+        // Once scrolled: the title and its save state, so a long document need not go back to the top.
+        Row(
+            Modifier.weight(1f).graphicsLayer { alpha = shadow; translationY = (1 - shadow) * 4.dp.toPx() },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                doc?.title ?: "", color = p.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (doc != null) SaveChip(m, doc)
+        }
         if (doc != null && editing) {
             Box(
                 Modifier.height(40.dp).pressable(RoundedCornerShape(20.dp), pressed = p.accent.copy(alpha = .1f), onClick = onDone).padding(horizontal = 14.dp),
@@ -734,7 +742,6 @@ private fun ChipText(text: String, color: Color = Tokens.palette.ink.copy(alpha 
 @Composable
 private fun Meta(m: AppModel, doc: Doc, onDot: () -> Unit) {
     val p = Tokens.palette
-    val status = m.library.status[doc.id]
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier.size(26.dp).clip(RoundedCornerShape(7.dp)).background(p.well).pressable(RoundedCornerShape(7.dp), onClick = onDot),
@@ -743,16 +750,24 @@ private fun Meta(m: AppModel, doc: Doc, onDot: () -> Unit) {
             Box(Modifier.size(13.dp).clip(CircleShape).background(p.tint(doc.color).base).border(1.dp, Color.Black.copy(alpha = .12f), CircleShape))
         }
         Chip { ChipText(shortTime(doc.updated)) }
-        Chip {
-            when {
-                !m.online -> {
-                    Ico(Icons.CloudOff, p.ink.copy(alpha = .62f), 13.dp)
-                    ChipText("离线")
-                }
-                status == SaveStatus.Error -> ChipText("保存失败", p.rec)
-                status == SaveStatus.Saving -> ChipText("保存中")
-                else -> ChipText("已保存")
+        SaveChip(m, doc)
+    }
+}
+
+/** 已保存, 保存中, 保存失败 or 离线: under the title, and in the bar once it has scrolled away. */
+@Composable
+private fun SaveChip(m: AppModel, doc: Doc) {
+    val p = Tokens.palette
+    val status = m.library.status[doc.id]
+    Chip {
+        when {
+            !m.online -> {
+                Ico(Icons.CloudOff, p.ink.copy(alpha = .62f), 13.dp)
+                ChipText("离线")
             }
+            status == SaveStatus.Error -> ChipText("保存失败", p.rec)
+            status == SaveStatus.Saving -> ChipText("保存中")
+            else -> ChipText("已保存")
         }
     }
 }
