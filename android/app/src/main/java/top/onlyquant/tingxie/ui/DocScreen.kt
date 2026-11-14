@@ -154,9 +154,11 @@ fun DocScreen(m: AppModel, route: Route.Doc) {
 }
 
 /** Where a tap on the rendered text landed: the block, and the point within it. */
-private data class Tap(val start: Int, val end: Int, val blockY: Float, val x: Float, val dy: Float)
+/** A tap on [start, end) of the source, at [dx], [dy] from where its words begin on screen, which is [blockY]. */
+private data class Tap(val start: Int, val end: Int, val blockY: Float, val dx: Float, val dy: Float)
 
-private data class Block(val start: Int, val end: Int, val y: Float)
+/** A block of text in view mode, its words starting at [textStart] in the source and at [x], [y] on screen. */
+private data class Block(val start: Int, val end: Int, val textStart: Int, val x: Float, val y: Float)
 
 /** Leaving edit mode: the text at [offset] stays where it is on screen once rendered. */
 private data class Exit(val offset: Int, val layout: TextLayoutResult, val scrollY: Int, val height: Int)
@@ -331,7 +333,9 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
         val len = l.layoutInput.text.length
         val start = tp.start.coerceIn(0, len)
         val top = l.getLineTop(l.getLineForOffset(start))
-        val off = l.getOffsetForPosition(Offset(tp.x, top + tp.dy)).coerceIn(start, tp.end.coerceIn(start, len))
+        // Measured from where the words begin on both sides, past list marks, "## " or "> ".
+        val left = l.getHorizontalPosition(start, true)
+        val off = l.getOffsetForPosition(Offset(left + tp.dx, top + tp.dy)).coerceIn(start, tp.end.coerceIn(start, len))
         value = value.copy(selection = TextRange(off))
         val target = (scroll.value + top - tp.blockY).toInt()
         scroll.scrollTo(target)
@@ -469,7 +473,7 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
                         detectTapGestures { o ->
                             if (!m.online) return@detectTapGestures
                             val b = blocks.values.filter { it.y <= o.y }.maxByOrNull { it.y }
-                            tap = if (b == null) null else Tap(b.start, b.end, b.y, o.x, o.y - b.y)
+                            tap = if (b == null) null else Tap(b.textStart, b.end, b.y, o.x - b.x, o.y - b.y)
                             placing = b != null
                             startEditing(if (b == null) doc.content.length else null)
                         }
@@ -482,7 +486,7 @@ private fun androidx.compose.foundation.layout.BoxScope.DocBody(m: AppModel, doc
                             onToggle = { off -> toggleTask(m, doc, off) },
                             overlays = overlays,
                             freshAlpha = { talk.freshAlpha.value },
-                            onBlock = { s, e, y -> blocks[s] = Block(s, e, y) },
+                            onBlock = { b -> blocks[b.start] = Block(b.start, b.end, b.textStart, b.x, b.y) },
                             modifier = tapper,
                         )
                     }

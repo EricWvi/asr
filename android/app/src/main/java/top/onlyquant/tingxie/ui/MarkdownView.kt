@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,8 +33,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -134,7 +136,8 @@ internal fun blocks(children: List<ASTNode>): List<Pair<ASTNode, Int>> {
  * @param server resolves site-relative image links (/api/images/…).
  * @param hits search words to mark in the text.
  * @param onToggle flips the task box whose "[" is at the given source offset.
- * @param onBlock reports where each top-level block starts, to scroll to a hit.
+ * @param onBlock reports where each block of text is, to place the cursor
+ *   where a tap was and to scroll to a hit.
  */
 @Composable
 fun MarkdownView(
@@ -146,7 +149,7 @@ fun MarkdownView(
     modifier: Modifier = Modifier,
     overlays: List<Overlay> = emptyList(),
     freshAlpha: () -> Float = { 1f },
-    onBlock: ((startOffset: Int, endOffset: Int, y: Float) -> Unit)? = null,
+    onBlock: ((BlockPos) -> Unit)? = null,
 ) {
     val p = Tokens.palette
     // Every line keeps its full height, half the leading above and half below
@@ -221,6 +224,8 @@ fun MarkdownView(
             }
         }
     }
+    val reporter = remember { Reporter() }
+    reporter.report = onBlock
     val transformer = remember(server) { RelativeImages(server) }
     val components = remember(tint, p, server) { components(tint, server, onToggle) }
 
@@ -238,7 +243,8 @@ fun MarkdownView(
         components = components,
         modifier = modifier,
         success = { state, comps, mod ->
-            Column(mod) {
+            Column(mod.onPlaced { reporter.root = it }) {
+              CompositionLocalProvider(LocalReporter provides reporter.takeIf { onBlock != null }) {
                 var below = 0.dp
                 var first = true
                 for ((node, blanks) in blocks(state.node.children)) {
@@ -248,10 +254,8 @@ fun MarkdownView(
                     Spacer(Modifier.height((if (first) 0.dp else maxOf(top, below)) + extra))
                     first = false
                     below = bottom
-                    Box(
-                        if (onBlock == null) Modifier
-                        else Modifier.onGloballyPositioned { onBlock(node.startOffset, node.endOffset, it.positionInParent().y) },
-                    ) {
+                    // Paragraphs and headings, also inside lists and quotes, report themselves.
+                    Box(if (node.type in selfReporting) Modifier else Modifier.reportBlock(node)) {
                         if (node.type == MarkdownElementTypes.LINK_DEFINITION) {
                             Text(node.getTextInNode(state.content).toString(), style = LocalMarkdownTypography.current.paragraph)
                         } else {
@@ -259,9 +263,40 @@ fun MarkdownView(
                         }
                     }
                 }
+              }
             }
         },
     )
+}
+
+/**
+ * Where a block's text is: its words begin at [textStart] in the source, past
+ * marks such as "## ", and at ([x], [y]) in the view.
+ */
+data class BlockPos(val start: Int, val end: Int, val textStart: Int, val x: Float, val y: Float)
+
+private class Reporter {
+    var report: ((BlockPos) -> Unit)? = null
+    var root: LayoutCoordinates? = null
+}
+
+private val LocalReporter = staticCompositionLocalOf<Reporter?> { null }
+
+private val selfReporting = setOf(
+    MarkdownElementTypes.PARAGRAPH, MarkdownElementTypes.UNORDERED_LIST, MarkdownElementTypes.ORDERED_LIST, MarkdownElementTypes.BLOCK_QUOTE,
+    MarkdownElementTypes.ATX_1, MarkdownElementTypes.ATX_2, MarkdownElementTypes.ATX_3, MarkdownElementTypes.ATX_4,
+    MarkdownElementTypes.ATX_5, MarkdownElementTypes.ATX_6, MarkdownElementTypes.SETEXT_1, MarkdownElementTypes.SETEXT_2,
+)
+
+/** Reports where this, the text of [node], sits in the view. */
+@Composable
+private fun Modifier.reportBlock(node: ASTNode, textStart: Int = node.startOffset): Modifier {
+    val r = LocalReporter.current ?: return this
+    return onGloballyPositioned { c ->
+        val root = r.root?.takeIf { it.isAttached } ?: return@onGloballyPositioned
+        val at = root.localPositionOf(c, Offset.Zero)
+        r.report?.invoke(BlockPos(node.startOffset, node.endOffset, textStart, at.x, at.y))
+    }
 }
 
 /** One flavour and parser for every view, so a recomposition does not parse again. */
@@ -323,7 +358,9 @@ private fun AnnotatedString.trimmed(): AnnotatedString {
 private fun Heading(content: String, node: ASTNode, style: TextStyle) {
     // ATX: [ATX_HEADER, ATX_CONTENT]; setext: [SETEXT_CONTENT, EOL, SETEXT_n].
     val inner = node.children.firstOrNull { it.type == MarkdownTokenTypes.ATX_CONTENT || it.type == MarkdownTokenTypes.SETEXT_CONTENT } ?: return
-    Text(inline(content, inner, style).trimmed(), style = style, modifier = Modifier.glowAnchor())
+    // The words start past "## " and the blanks after it, as the trimmed text does.
+    val lead = content.substring(inner.startOffset, inner.endOffset).let { t -> t.indexOfFirst { !it.isWhitespace() }.let { if (it < 0) t.length else it } }
+    Text(inline(content, inner, style).trimmed(), style = style, modifier = Modifier.glowAnchor().reportBlock(node, inner.startOffset + lead))
 }
 
 /** A paragraph, or a picture when it holds nothing but one image. */
@@ -339,6 +376,7 @@ private fun Paragraph(content: String, node: ASTNode, server: String) {
                 absolute(server, link), contentDescription = null, contentScale = ContentScale.FillWidth,
                 modifier = Modifier
                     .padding(top = 4.dp)
+                    .reportBlock(node)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, p.line, RoundedCornerShape(12.dp)),
@@ -346,7 +384,7 @@ private fun Paragraph(content: String, node: ASTNode, server: String) {
             return
         }
     }
-    MarkdownParagraph(content, node, Modifier.glowAnchor(), style = LocalMarkdownTypography.current.paragraph)
+    MarkdownParagraph(content, node, Modifier.glowAnchor().reportBlock(node), style = LocalMarkdownTypography.current.paragraph)
 }
 
 private fun ASTNode.findDest(content: String): String? {
